@@ -18,40 +18,15 @@ import sys
 
 import httpx
 
+from app.data.catalog import DEMO_OUTCOME, DEMO_PRESETS
 from app.hindsight.memory import MemoryService
 
 API = "http://localhost:8000/api"
 MACHINE = "AC-407"
 
-INCIDENT_1 = {
-    "machine_id": MACHINE,
-    "machine_type": "Screw_Air_Compressor",
-    "production_line": "Utilities - Molding Hall",
-    "defect_type": "condensate_drain_failure",
-    "symptoms": ["water in compressed air line", "auto drain not cycling"],
-    "sensor_values": {"discharge_pressure_bar": 7.5, "discharge_temp_c": 82},
-    "description": "Water spitting from the air drops at the molding hall. Electronic drain on the wet receiver is not cycling; manual test button does nothing.",
-    "operating_hours": 1180,
-    "technician_id": "T-138",
-}
-
-OUTCOME_1 = {
-    "intervention_category": "Condensate drain replacement",
-    "action_taken": "Replaced zero-loss condensate drain on wet receiver and cleaned inlet strainer",
-    "action_outcome": "SUCCESS",
-    "confirmed_root_cause": "Drain inlet strainer blocked with rust and pipe sludge from new installation; valve could not discharge",
-    "resolution_time_minutes": 55,
-    "downtime_minutes": 90,
-    "technician_notes": "Old drain full of rust flakes from the new receiver pipework. Fitted new drain, blew down receiver. Dry air at drops after 1 h.",
-}
-
-INCIDENT_2 = {
-    **INCIDENT_1,
-    "symptoms": ["water in compressed air line", "wet receiver tank level high"],
-    "description": "Moisture again at molding hall drops and the wet receiver sight glass is almost full; drain does not seem to discharge.",
-    "operating_hours": 1630,
-    "technician_id": "T-126",
-}
+INCIDENT_1 = DEMO_PRESETS[0]["incident"]
+OUTCOME_1 = DEMO_OUTCOME
+INCIDENT_2 = DEMO_PRESETS[1]["incident"]
 
 
 async def reset() -> int:
