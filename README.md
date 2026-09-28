@@ -14,6 +14,7 @@ When a new incident is reported, TRACE recalls similar past work orders from **H
 - [Configuration](#configuration)
 - [API reference](#api-reference)
 - [Frontend](#frontend)
+- [Testing](#testing)
 - [Verification](#verification)
 - [Demo](#demo-1-minute)
 - [Limitations](#limitations)
@@ -144,7 +145,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api
 | GET | `/api/dashboard/stats` | Counts, outcome / defect / machine-type distributions, downtime, history range, memory bank |
 | GET | `/api/dashboard/fleet` | Machine types, machines, defect types + symptoms, intervention categories, hero machine per type (drives the forms) |
 | GET | `/api/dashboard/hero-machines` | Live with/without-memory comparison for the hero machines |
-| GET | `/api/dashboard/health` | Health check |
+| GET | `/api/dashboard/health` | Checks SQLite, the Hindsight bank (with the configured key) and LLM configuration; `healthy` or `degraded`, cached 30 s. Drives the sidebar status |
+
+Errors are JSON `{"detail": ...}`: 404 unknown incident, 422 invalid input, 503 when Hindsight is unreachable (nothing is saved: a failed memory write rolls the SQLite change back).
 
 Interactive docs: `http://localhost:8000/docs`.
 
@@ -154,6 +157,27 @@ Interactive docs: `http://localhost:8000/docs`.
 - **Report Incident** — built from `/api/dashboard/fleet`: machine type → machine (line fills in) → problem (or a new, unlisted one) → that problem's symptoms.
 - **Incident Analysis** — pipeline panel and memory moment, then the numbered flow: what happened · what TRACE remembered (grouped by outcome, each with the recalled memory text) · recommendation with computed basis and evidence tally · AI-written summary in a separate dashed box · where the evidence came from · record outcome.
 - **Machine Memory** — outcome counts, recurring defects, what has / hasn't worked, intervention chart, full maintenance timeline.
+
+## Testing
+
+```bash
+cd backend
+pytest                      # 49 offline tests, ~2 s: temp SQLite + in-memory Hindsight fake, no LLM
+TRACE_LIVE=1 pytest -m live # 4 live tests against the running API with real Hindsight + Groq (~2 min)
+
+cd frontend
+npm run typecheck
+```
+
+| File | Covers |
+|---|---|
+| `tests/test_recommendation.py` | Scoring and confidence rules, same-machine rule, downgrade, warnings, no action without evidence |
+| `tests/test_evidence_gate.py` | Relevance gate, same-machine-first ordering, evidence cap |
+| `tests/test_phrasing.py` | LLM wording only: fallback on no key / error / empty reply / invented incident ID / no admission of missing evidence |
+| `tests/test_dataset.py` | Generator is deterministic, sizes, IDs, timestamps, operating hours, mixed outcomes, hero chains |
+| `tests/test_memory.py` | Narrative content, tags, recall grouping, rollback when Hindsight writes fail |
+| `tests/test_api.py` | Full HTTP flow (analyze → outcome → recall → machine memory), hero machines, health, errors (404/422/503), CORS, and a **frontend contract check**: every response is validated against the TypeScript interfaces in `frontend/src/types/incident.ts` |
+| `tests/test_live.py` | Health, the 6 validation scenarios, the demo twice from reset, data audit — real services |
 
 ## Verification
 
