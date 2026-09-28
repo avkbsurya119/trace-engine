@@ -7,9 +7,10 @@ import { ReportIncident } from "@/components/ReportIncident";
 import { IncidentAnalysis } from "@/components/IncidentAnalysis";
 import { MachineMemory } from "@/components/MachineMemory";
 import { BeforeAfterMemory } from "@/components/BeforeAfterMemory";
-import type { AnalysisResult } from "@/types/incident";
+import { IntelligencePage } from "@/components/intelligence/IntelligencePage";
+import type { AnalysisResult, DemoPreset } from "@/types/incident";
 
-type View = "dashboard" | "report" | "analysis" | "memory";
+type View = "dashboard" | "intelligence" | "report" | "analysis" | "memory";
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<View>("dashboard");
@@ -18,6 +19,12 @@ export default function Home() {
   );
   const [selectedMachineId, setSelectedMachineId] = useState<string>("");
   const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+  const [reportPreset, setReportPreset] = useState<DemoPreset | null>(null);
+
+  const openReport = (preset: DemoPreset | null = null) => {
+    setReportPreset(preset);
+    setCurrentView("report");
+  };
 
   const handleAnalysisComplete = (result: AnalysisResult) => {
     setAnalysisResult(result);
@@ -30,6 +37,7 @@ export default function Home() {
   };
 
   const handleNavigate = (view: View) => {
+    if (view === "report") setReportPreset(null);
     setCurrentView(view);
     // Clear machine ID when navigating away from memory
     if (view !== "memory") {
@@ -42,14 +50,19 @@ export default function Home() {
       case "dashboard":
         return (
           <Dashboard
-            onReportIncident={() => setCurrentView("report")}
+            onReportIncident={() => openReport()}
+            onStartDemo={openReport}
             onViewMachineMemory={handleViewMachineMemory}
             onShowBeforeAfter={() => setShowBeforeAfter(true)}
           />
         );
+      case "intelligence":
+        return <IntelligencePage onViewMachineMemory={handleViewMachineMemory} />;
       case "report":
         return (
           <ReportIncident
+            key={reportPreset?.key ?? "blank"}
+            preset={reportPreset?.incident}
             onAnalysisComplete={handleAnalysisComplete}
             onCancel={() => setCurrentView("dashboard")}
           />
@@ -64,8 +77,10 @@ export default function Home() {
           />
         ) : (
           <Dashboard
-            onReportIncident={() => setCurrentView("report")}
+            onReportIncident={() => openReport()}
+            onStartDemo={openReport}
             onViewMachineMemory={handleViewMachineMemory}
+            onShowBeforeAfter={() => setShowBeforeAfter(true)}
           />
         );
       case "memory":

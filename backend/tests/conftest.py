@@ -32,6 +32,7 @@ def fake_hindsight(monkeypatch, request):
     import app.hindsight.memory as memory_module
 
     FakeHindsightClient.reset()
+    memory_module.MEMORY_STATUS.update(last_error=None, at=0.0)
     monkeypatch.setattr(memory_module, "HindsightClient", FakeHindsightClient)
     monkeypatch.setattr(dashboard_api, "HindsightClient", FakeHindsightClient)
     dashboard_api._health_cache.update(at=0.0, value=None)

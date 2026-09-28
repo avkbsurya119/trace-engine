@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { cn, formatDay, formatHours, getOutcomeBgColor, humanize } from "@/lib/utils";
 import type { HeroMachine } from "@/types/incident";
+import { CONFIDENCE_LABEL, ConfidenceMeter, type Confidence } from "@/components/ui";
 import {
   Brain,
   AlertTriangle,
@@ -23,12 +24,9 @@ interface Props {
   onViewMachineMemory?: (machineId: string) => void;
 }
 
-const CONFIDENCE_LABEL: Record<string, string> = {
-  HIGH: "HIGH confidence",
-  MEDIUM: "MEDIUM confidence",
-  LOW: "LOW confidence",
-  INSUFFICIENT_DATA: "Insufficient evidence",
-};
+function winnerOf(hero: HeroMachine) {
+  return hero.with_memory.evidence.find((e) => e.verdict === "selected");
+}
 
 export function BeforeAfterMemory({ onClose, onViewMachineMemory }: Props) {
   const [heroes, setHeroes] = useState<HeroMachine[] | null>(null);
@@ -43,23 +41,52 @@ export function BeforeAfterMemory({ onClose, onViewMachineMemory }: Props) {
   }, []);
 
   const hero = heroes?.[active];
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Dialog behaviour: focus inside on open, Esc closes, focus returns on close.
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      previous?.focus?.();
+    };
+  }, []);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="before-after-title"
+        className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto"
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-industrial-600 to-industrial-700 text-white p-6 rounded-t-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Brain className="w-8 h-8" />
               <div>
-                <h2 className="text-2xl font-bold">Before vs After Memory</h2>
+                <h2 id="before-after-title" className="text-2xl font-bold">Before vs After Memory</h2>
                 <p className="text-industrial-200">
                   The same incident scored twice, live: once with no memory, once with Hindsight recall
                 </p>
               </div>
             </div>
-            <button onClick={onClose} className="text-white/80 hover:text-white text-2xl">
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={onClose}
+              aria-label="Close memory impact"
+              className="text-white/80 hover:text-white text-2xl leading-none px-2 rounded focus-visible:ring-2 focus-visible:ring-white"
+            >
               &times;
             </button>
           </div>
@@ -67,10 +94,13 @@ export function BeforeAfterMemory({ onClose, onViewMachineMemory }: Props) {
 
         {/* Hero machine tabs */}
         <div className="border-b border-gray-200 px-6 pt-4">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap" role="tablist" aria-label="Hero machines">
             {(heroes ?? []).map((h, i) => (
               <button
                 key={h.key}
+                type="button"
+                role="tab"
+                aria-selected={active === i}
                 onClick={() => setActive(i)}
                 className={cn(
                   "px-4 py-2 rounded-t-lg font-medium text-sm transition-colors",
@@ -152,9 +182,7 @@ export function BeforeAfterMemory({ onClose, onViewMachineMemory }: Props) {
                       {hero.without_memory.suggested_action}
                     </p>
                   </div>
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
-                    {CONFIDENCE_LABEL[hero.without_memory.confidence]}
-                  </span>
+                  <ConfidenceMeter confidence={hero.without_memory.confidence as Confidence} size="sm" />
                   <div>
                     <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
                       <AlertTriangle className="w-4 h-4" />
@@ -220,9 +248,12 @@ export function BeforeAfterMemory({ onClose, onViewMachineMemory }: Props) {
                       {hero.with_memory.suggested_action}
                     </p>
                   </div>
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-green-200 text-green-800">
-                    {CONFIDENCE_LABEL[hero.with_memory.confidence]}
-                  </span>
+                  <ConfidenceMeter
+                    confidence={hero.with_memory.confidence as Confidence}
+                    successes={winnerOf(hero)?.successes}
+                    attempts={winnerOf(hero)?.attempts}
+                    size="sm"
+                  />
                   <div>
                     <div className="flex items-center gap-2 text-sm text-green-700 mb-1">
                       <History className="w-4 h-4" />
@@ -276,9 +307,9 @@ export function BeforeAfterMemory({ onClose, onViewMachineMemory }: Props) {
                 <div className="bg-white/10 rounded-lg p-4">
                   <p className="text-green-200 text-sm">Confidence</p>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="text-white/60">{CONFIDENCE_LABEL[hero.without_memory.confidence]}</span>
+                    <span className="text-white/60">{CONFIDENCE_LABEL[hero.without_memory.confidence as Confidence]}</span>
                     <ArrowRight className="w-4 h-4" />
-                    <span className="font-bold">{CONFIDENCE_LABEL[hero.with_memory.confidence]}</span>
+                    <span className="font-bold">{CONFIDENCE_LABEL[hero.with_memory.confidence as Confidence]}</span>
                   </div>
                 </div>
                 <div className="bg-white/10 rounded-lg p-4">

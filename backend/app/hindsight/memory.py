@@ -17,7 +17,23 @@ from datetime import timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.config import settings
-from app.core.errors import MemoryUnavailableError
+import time
+
+from app.core.errors import MemoryUnavailableError, describe_memory_error
+
+# Last Hindsight failure seen by any request, so /health can report real
+# memory problems (e.g. exhausted credits) without spending extra calls.
+MEMORY_STATUS = {"last_error": None, "at": 0.0}
+
+
+def _memory_failed(exc: Exception, action: str) -> MemoryUnavailableError:
+    reason = describe_memory_error(exc)
+    MEMORY_STATUS.update(last_error=reason, at=time.time())
+    return MemoryUnavailableError(f"{action}: {reason}")
+
+
+def _memory_ok() -> None:
+    MEMORY_STATUS.update(last_error=None, at=time.time())
 from app.data.catalog import FLEET
 from app.data.generator import slug
 from app.db.repository import IncidentRepository
@@ -199,7 +215,8 @@ class MemoryService:
         except Exception as exc:
             # Keep the two stores consistent: no SQLite row without a memory.
             await self.repository.delete_many([incident.incident_id])
-            raise MemoryUnavailableError(f"Could not store incident in Hindsight: {exc}") from exc
+            raise _memory_failed(exc, "Could not store the incident") from exc
+        _memory_ok()
         return incident.incident_id
 
     async def retain_many(self, incidents: List[Incident]) -> int:
@@ -252,7 +269,8 @@ class MemoryService:
                 self.client.recall(query=query, tags=[type_tag, machine_tag], max_tokens=3000),
             )
         except Exception as exc:
-            raise MemoryUnavailableError(f"Hindsight recall failed: {exc}") from exc
+            raise _memory_failed(exc, "Memory search failed") from exc
+        _memory_ok()
         memories = fleet_memories + machine_memories
 
         facts_by_doc: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -365,7 +383,8 @@ class MemoryService:
         except Exception as exc:
             # Roll SQLite back so it never claims an outcome memory lacks.
             await self.repository.update(previous)
-            raise MemoryUnavailableError(f"Could not update Hindsight memory: {exc}") from exc
+            raise _memory_failed(exc, "Could not update memory") from exc
+        _memory_ok()
         return updated
 
     async def delete_incidents(self, incident_ids: List[str]) -> int:
@@ -402,6 +421,24 @@ class MemoryService:
                 outcomes[incident.action_outcome.value] += 1
 
         timestamps = [i.timestamp for i in incidents]
+
+        # Knowledge growth: work orders and recorded outcomes per month, cumulative.
+        per_month: Dict[str, Dict[str, int]] = defaultdict(lambda: {"incidents": 0, "outcomes": 0})
+        for incident in incidents:
+            month = incident.timestamp.strftime("%Y-%m")
+            per_month[month]["incidents"] += 1
+            per_month[month]["outcomes"] += int(incident.action_outcome is not None)
+        growth, running_incidents, running_outcomes = [], 0, 0
+        for month in sorted(per_month):
+            running_incidents += per_month[month]["incidents"]
+            running_outcomes += per_month[month]["outcomes"]
+            growth.append({
+                "month": month,
+                "incidents": per_month[month]["incidents"],
+                "cumulative_incidents": running_incidents,
+                "cumulative_outcomes": running_outcomes,
+            })
+
         return {
             "total_incidents": len(incidents),
             "incidents_with_outcome": with_outcome,
@@ -413,4 +450,5 @@ class MemoryService:
             "history_start": min(timestamps).isoformat() if timestamps else None,
             "history_end": max(timestamps).isoformat() if timestamps else None,
             "memory_bank": settings.hindsight_namespace,
+            "memory_growth": growth,
         }

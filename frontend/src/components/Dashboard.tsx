@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { cn, formatDay, humanize } from "@/lib/utils";
-import type { DashboardStats, Fleet } from "@/types/incident";
+import type { DashboardStats, DemoPreset, Fleet } from "@/types/incident";
+import { MemoryGrowthChart } from "@/components/MemoryGrowthChart";
 import {
   AlertTriangle,
   CheckCircle,
@@ -25,12 +26,14 @@ interface DashboardProps {
   onReportIncident: () => void;
   onViewMachineMemory: (machineId: string) => void;
   onShowBeforeAfter?: () => void;
+  onStartDemo?: (preset: DemoPreset) => void;
 }
 
 export function Dashboard({
   onReportIncident,
   onViewMachineMemory,
   onShowBeforeAfter,
+  onStartDemo,
 }: DashboardProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,6 +134,11 @@ export function Dashboard({
         </div>
       ) : stats ? (
         <>
+          {/* Demo guide */}
+          {fleet && fleet.demo_presets.length >= 2 && onStartDemo && (
+            <DemoGuide fleet={fleet} onStartDemo={onStartDemo} onShowBeforeAfter={onShowBeforeAfter} onViewMachine={onViewMachineMemory} />
+          )}
+
           {/* Memory Health Banner */}
           <MemoryHealthBanner
             totalIncidents={stats.total_incidents}
@@ -244,6 +252,22 @@ export function Dashboard({
               )}
             </div>
           </div>
+
+          {/* Knowledge growth */}
+          {stats.memory_growth && stats.memory_growth.length > 1 && (
+            <section aria-labelledby="growth-heading" className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                <h3 id="growth-heading" className="text-lg font-semibold text-industrial-900 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-industrial-600" aria-hidden />
+                  Knowledge growth
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Recorded outcomes TRACE can learn from, by month · every new outcome is recalled for future incidents
+                </p>
+              </div>
+              <MemoryGrowthChart points={stats.memory_growth} />
+            </section>
+          )}
 
           {/* Machine Fleet Overview */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -625,5 +649,78 @@ function EmptyState({ message }: { message: string }) {
       <Activity className="w-8 h-8 mb-2" />
       <p className="text-sm">{message}</p>
     </div>
+  );
+}
+
+/** The 3-minute story, one click per step. Presets come from the backend catalog. */
+function DemoGuide({
+  fleet,
+  onStartDemo,
+  onShowBeforeAfter,
+  onViewMachine,
+}: {
+  fleet: Fleet;
+  onStartDemo: (preset: DemoPreset) => void;
+  onShowBeforeAfter?: () => void;
+  onViewMachine: (machineId: string) => void;
+}) {
+  const [first, second] = fleet.demo_presets;
+  const outcome = fleet.demo_outcome;
+  const steps: { title: string; detail: string; action?: { label: string; run: () => void } }[] = [
+    {
+      title: "Memory impact",
+      detail: "Same incident scored with and without memory on the hero machines.",
+      action: onShowBeforeAfter ? { label: "See memory impact", run: onShowBeforeAfter } : undefined,
+    },
+    {
+      title: "A problem nobody has seen",
+      detail: `${first.incident.machine_id}: TRACE searches memory and withholds a recommendation.`,
+      action: { label: "Load incident 1", run: () => onStartDemo(first) },
+    },
+    {
+      title: "Record what worked",
+      detail: `On the analysis page, record “${outcome.intervention_category}” as ${outcome.action_outcome}.`,
+    },
+    {
+      title: "It happens again",
+      detail: `${second.incident.machine_id}: TRACE recalls step 2 and recommends the fix, citing it.`,
+      action: { label: "Load incident 2", run: () => onStartDemo(second) },
+    },
+    {
+      title: "Machine memory",
+      detail: `Timeline of ${first.incident.machine_id}, or a long history like CNC-204.`,
+      action: { label: `Open ${first.incident.machine_id}`, run: () => onViewMachine(first.incident.machine_id) },
+    },
+  ];
+
+  return (
+    <section aria-labelledby="demo-heading" className="bg-white rounded-xl border border-industrial-200 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+        <h3 id="demo-heading" className="text-base font-semibold text-industrial-900">
+          Demo guide: memory in 3 minutes
+        </h3>
+        <p className="text-xs text-gray-500">
+          Before presenting: <code className="bg-gray-100 px-1 rounded">python -m scripts.demo --reset</code>
+        </p>
+      </div>
+      <ol className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        {steps.map((step, i) => (
+          <li key={step.title} className="rounded-lg bg-gray-50 border border-gray-100 p-3 flex flex-col">
+            <p className="text-xs font-semibold text-industrial-600">Step {i + 1}</p>
+            <p className="text-sm font-medium text-gray-900">{step.title}</p>
+            <p className="text-xs text-gray-600 mt-1 flex-1">{step.detail}</p>
+            {step.action && (
+              <button
+                type="button"
+                onClick={step.action.run}
+                className="mt-2 self-start text-xs font-medium px-2.5 py-1 rounded-md bg-industrial-600 text-white hover:bg-industrial-700"
+              >
+                {step.action.label}
+              </button>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

@@ -276,16 +276,45 @@ function StatCard({
 }
 
 function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
+  const [problem, setProblem] = useState<string | null>(null);
   if (incidents.length === 0) {
     return <p className="text-gray-500 text-sm">No incidents recorded.</p>;
   }
 
+  // How each work order relates to the previous one for the same problem.
+  const chain = new Map<string, "follow-up" | "recurred">();
+  const lastByProblem = new Map<string, MachineTimelineEntry>();
+  for (const entry of [...incidents].reverse()) {
+    const previous = lastByProblem.get(entry.defect_type);
+    if (previous) chain.set(entry.incident_id, previous.action_outcome === "SUCCESS" ? "recurred" : "follow-up");
+    lastByProblem.set(entry.defect_type, entry);
+  }
+  const counts = incidents.reduce<Record<string, number>>((acc, i) => ((acc[i.defect_type] = (acc[i.defect_type] ?? 0) + 1), acc), {});
+  const shown = problem ? incidents.filter((i) => i.defect_type === problem) : incidents;
+
   return (
+    <div>
+      <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filter timeline by problem">
+        {[null, ...Object.keys(counts)].map((key) => (
+          <button
+            key={key ?? "all"}
+            type="button"
+            aria-pressed={problem === key}
+            onClick={() => setProblem(key)}
+            className={cn(
+              "text-xs px-2.5 py-1 rounded-full border transition-colors",
+              problem === key ? "bg-industrial-600 text-white border-industrial-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"
+            )}
+          >
+            {key ? `${humanize(key)} (${counts[key]})` : `All (${incidents.length})`}
+          </button>
+        ))}
+      </div>
     <div className="relative">
-      <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" />
-      <div className="space-y-3">
-        {incidents.map((incident, i) => (
-          <div key={incident.incident_id} className="relative pl-8">
+      <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" aria-hidden />
+      <ol className="space-y-3">
+        {shown.map((incident, i) => (
+          <li key={incident.incident_id} className="relative pl-8">
             <div
               className={cn(
                 "absolute left-0 top-1 w-6 h-6 rounded-full flex items-center justify-center",
@@ -310,11 +339,17 @@ function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
               <div className="flex items-center justify-between mb-1 gap-2">
                 <p className="text-sm font-medium text-gray-900">
                   {humanize(incident.defect_type)}
-                  {i === 0 && (
+                  {i === 0 && !problem && (
                     <span className="ml-2 inline-flex items-center gap-1 text-xs text-industrial-600">
-                      <Zap className="w-3 h-3" />
+                      <Zap className="w-3 h-3" aria-hidden />
                       Most recent
                     </span>
+                  )}
+                  {chain.get(incident.incident_id) === "follow-up" && (
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Follow-up: previous attempt didn&apos;t work</span>
+                  )}
+                  {chain.get(incident.incident_id) === "recurred" && (
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Came back after a fix</span>
                   )}
                 </p>
                 <span className={cn("text-xs px-2 py-0.5 rounded flex-shrink-0", getOutcomeBgColor(incident.action_outcome))}>
@@ -339,9 +374,10 @@ function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
                 <p className="text-xs text-gray-500 mt-1">&ldquo;{incident.technician_notes}&rdquo;</p>
               )}
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
+    </div>
     </div>
   );
 }

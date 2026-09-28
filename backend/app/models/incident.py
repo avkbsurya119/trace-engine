@@ -175,6 +175,19 @@ class EvidenceSummary(BaseModel):
     incident_ids: Dict[str, List[str]] = Field(
         default_factory=dict, description="Incident IDs keyed by outcome"
     )
+    attempts: int = Field(0, description="successes + partials + failures (UNKNOWN is not an attempt)")
+    success_rate: Optional[float] = Field(None, description="successes / attempts, None when no attempts")
+    verdict: str = Field("rejected", description="'selected' for the recommended intervention, else 'rejected'")
+    verdict_reason: str = Field("", description="Deterministic one-line reason for the verdict")
+
+
+class ConfidenceCheck(BaseModel):
+    """One rule of the confidence calculation and whether it was met."""
+
+    level: str = Field(..., description="Which decision the rule belongs to: EVIDENCE, HIGH, MEDIUM or DOWNGRADE")
+    rule: str
+    passed: bool
+    detail: str = ""
 
 
 class Recommendation(BaseModel):
@@ -199,6 +212,9 @@ class Recommendation(BaseModel):
     )
     evidence: List[EvidenceSummary] = Field(
         default_factory=list, description="Per-intervention tallies the decision was computed from"
+    )
+    confidence_checks: List[ConfidenceCheck] = Field(
+        default_factory=list, description="The rules behind the confidence level, each marked met or not"
     )
     reasoning_source: str = Field(
         default="deterministic",

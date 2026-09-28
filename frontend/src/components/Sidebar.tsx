@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 
-type View = "dashboard" | "report" | "analysis" | "memory";
+type View = "dashboard" | "intelligence" | "report" | "analysis" | "memory";
 
 interface SidebarProps {
   currentView: View;
@@ -23,6 +23,7 @@ interface SidebarProps {
 
 const navItems = [
   { id: "dashboard" as View, label: "Dashboard", icon: LayoutDashboard },
+  { id: "intelligence" as View, label: "TRACE Intelligence", icon: Brain },
   { id: "report" as View, label: "Report Incident", icon: FileWarning },
 ];
 
