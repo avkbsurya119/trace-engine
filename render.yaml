@@ -1,0 +1,42 @@
+databases: []
+
+services:
+  # Backend API (FastAPI)
+  - type: web
+    name: trace-api
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./trace.db
+      - key: CORS_ORIGINS
+        value: '["https://trace-frontend.onrender.com", "http://localhost:3000"]'
+      - key: HINDSIGHT_API_URL
+        value: https://api.hindsight.vectorize.io
+      - key: HINDSIGHT_NAMESPACE
+        value: trace-manufacturing
+      - key: HINDSIGHT_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+  # Frontend (Next.js)
+  - type: web
+    name: trace-frontend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NEXT_PUBLIC_API_URL
+        value: https://trace-api.onrender.com/api
