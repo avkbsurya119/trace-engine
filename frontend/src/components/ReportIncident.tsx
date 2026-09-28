@@ -7,12 +7,11 @@ import type { IncidentCreate, AnalysisResult, Fleet } from "@/types/incident";
 import { AnalysisProgress } from "@/components/analysis/AnalysisProgress";
 import { Plus, Loader2, Search } from "lucide-react";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, CARD, ErrorState, PageHeader } from "@/components/ui";
-import { usePresentation } from "@/components/JudgeMode";
 
 interface ReportIncidentProps {
   onAnalysisComplete: (result: AnalysisResult) => void;
   onCancel: () => void;
-  /** Pre-filled incident (Judge mode or demo preset). */
+  /** Pre-filled incident (demo preset). */
   preset?: IncidentCreate | null;
 }
 
@@ -43,7 +42,6 @@ export function ReportIncident({
   const [formData, setFormData] = useState<IncidentCreate>({ ...EMPTY_INCIDENT, ...(preset ?? {}) });
 
   const [customSymptom, setCustomSymptom] = useState("");
-  const presenting = usePresentation();
   const [fleet, setFleet] = useState<Fleet | null>(null);
   const [defectChoice, setDefectChoice] = useState(preset?.defect_type ?? "");
   const [newDefect, setNewDefect] = useState("");
@@ -141,7 +139,7 @@ export function ReportIncident({
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && <ErrorState title="The incident could not be analyzed" detail={error} />}
 
-          {fleet && fleet.demo_presets.length > 0 && !presenting && (
+          {fleet && fleet.demo_presets.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[#38bdf8]/10 border border-[#38bdf8]/20 px-4 py-3">
               <label htmlFor="demo-preset" className="text-sm text-[#38bdf8] font-medium">
                 Load a demo incident

@@ -17,7 +17,7 @@ interface Props {
 }
 
 /**
- * Incident analysis. Reading order is the judge's questions:
+ * Incident analysis. Reading order follows the technician's questions:
  * what TRACE recommends and how sure it is -> how it decided -> what happened
  * -> why (rules, alternatives) -> what memory held -> record the outcome.
  */

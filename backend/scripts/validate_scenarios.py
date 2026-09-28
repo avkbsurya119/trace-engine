@@ -1,7 +1,7 @@
 """
 Validation suite: runs realistic scenarios through the live API
 (real Hindsight recall, real deterministic scoring, real LLM phrasing)
-and checks the behaviour a judge would expect. Incidents created by the
+and checks the behaviour a technician would expect. Incidents created by the
 suite are removed from SQLite and Hindsight afterwards.
 
     uvicorn main:app --port 8000        # in another terminal

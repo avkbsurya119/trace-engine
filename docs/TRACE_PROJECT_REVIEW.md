@@ -122,7 +122,7 @@ Trial and error is the main source of wasted downtime.
 | `backend/tests/` | 73 offline tests + 4 live; `fakes.py` (Hindsight fake), `ts_contract.py` (TS interface reader) |
 | `frontend/public/` | `landing.html` / `ascend.html` (Three.js landing), `icon.svg` |
 | `frontend/src/app/` | `layout.tsx`, `page.tsx` (view switching, `?view=`/`?machine=` deep links, landing iframe), `globals.css` |
-| `frontend/src/components/` | Screens (`Dashboard`, `ReportIncident`, `IncidentAnalysis`, `MachineMemory`, `SliderDashboard`, `BeforeAfterMemory`, `Sidebar`), `ui.tsx` primitives, `analysis/*`, `intelligence/*`, `JudgeMode.tsx` (unused) |
+| `frontend/src/components/` | Screens (`Dashboard`, `ReportIncident`, `IncidentAnalysis`, `MachineMemory`, `SliderDashboard`, `BeforeAfterMemory`, `Sidebar`), `ui.tsx` primitives, `analysis/*`, `intelligence/*` |
 | `frontend/src/lib/` · `types/` | `api.ts` (typed client, cache), `utils.ts`; `incident.ts` (TS mirror of the API) |
 
 ---
@@ -177,7 +177,7 @@ Trial and error is the main source of wasted downtime.
 - Motion respects `prefers-reduced-motion`.
 - Accessibility: skip link, one `h1` per view, `aria-current`, labelled controls and text alternatives for charts.
 
-**Redesign note.** PR #10 replaced the light "industrial" theme with a dark navy glass theme, added the landing page and ROI view, and removed **Judge mode** (the presenter bar) from the page and sidebar. `JudgeMode.tsx` is still in the repo, and `ReportIncident` still reads its `usePresentation()` context, which defaults to false.
+**Redesign note.** PR #10 replaced the light "industrial" theme with a dark navy glass theme, and added the landing page and ROI view.
 
 ---
 
