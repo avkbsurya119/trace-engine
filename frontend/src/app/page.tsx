@@ -27,6 +27,14 @@ export default function Home() {
     setCurrentView("memory");
   };
 
+  const handleNavigate = (view: View) => {
+    setCurrentView(view);
+    // Clear machine ID when navigating away from memory
+    if (view !== "memory") {
+      setSelectedMachineId("");
+    }
+  };
+
   const renderContent = () => {
     switch (currentView) {
       case "dashboard":
@@ -70,8 +78,12 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar currentView={currentView} onNavigate={setCurrentView} />
-      <main className="flex-1 p-8">{renderContent()}</main>
+      <Sidebar
+        currentView={currentView}
+        onNavigate={handleNavigate}
+        onViewMachineMemory={handleViewMachineMemory}
+      />
+      <main className="flex-1 p-8 bg-gray-50">{renderContent()}</main>
     </div>
   );
 }

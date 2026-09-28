@@ -64,6 +64,7 @@ export interface Recommendation {
   reasoning: string;
   supporting_incidents: string[];
   warnings: string[];
+  reasoning_source?: "llm" | "deterministic";
 }
 
 export interface AnalysisResult {
