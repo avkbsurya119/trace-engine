@@ -1,48 +1,49 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { cn, formatDay, humanize } from "@/lib/utils";
 import type { DashboardStats, Fleet } from "@/types/incident";
 import {
+  Brain,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Plus,
-  Server,
-  Brain,
-  TrendingUp,
   Activity,
-  Zap,
-  Target,
-  ArrowRight,
-  BarChart3,
-  Loader2,
   Clock,
+  Target,
+  Zap,
+  Loader2,
+  BarChart3,
+  Server,
+  ArrowRight,
+  TrendingUp,
+  Plus,
+  SlidersHorizontal,
 } from "lucide-react";
+import { SliderDashboard } from "./SliderDashboard";
 
-interface DashboardProps {
+interface Props {
   onReportIncident: () => void;
   onViewMachineMemory: (machineId: string) => void;
   onShowBeforeAfter?: () => void;
+  onOpenSliders?: () => void;
 }
 
 export function Dashboard({
   onReportIncident,
   onViewMachineMemory,
   onShowBeforeAfter,
-}: DashboardProps) {
+  onOpenSliders,
+}: Props) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [fleet, setFleet] = useState<Fleet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [fleet, setFleet] = useState<Fleet | null>(null);
-
-  useEffect(() => {
-    api.getFleet().then(setFleet).catch(() => setFleet(null));
-  }, []);
 
   useEffect(() => {
     async function fetchStats() {
+      api.getFleet().then(setFleet).catch(() => null);
       try {
         const data = await api.getDashboardStats();
         setStats(data);
@@ -57,8 +58,9 @@ export function Dashboard({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-12 h-12 animate-spin text-industrial-600" />
+      <div className="flex flex-col items-center justify-center h-80 gap-3">
+        <Loader2 className="w-10 h-10 animate-spin text-[#38bdf8]" />
+        <p className="text-xs text-[#8290ab] font-mono uppercase tracking-widest">Loading Telemetry & Memory Matrices...</p>
       </div>
     );
   }
@@ -88,45 +90,62 @@ export function Dashboard({
       : 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-[#1e2a4a]">
         <div>
-          <h2 className="text-2xl font-bold text-industrial-900">
-            TRACE Dashboard
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#1e2a4a]/80 border border-[#3b82f6]/35 text-[#38bdf8] text-xs font-semibold uppercase tracking-wider mb-2 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] animate-pulse shadow-[0_0_8px_#38bdf8]" />
+            Plant Floor Intelligence
+          </div>
+          <h2 className="text-3xl font-extrabold text-white tracking-tight">
+            TRACE Fleet Console
           </h2>
-          <p className="text-industrial-600">
-            Organizational memory for manufacturing troubleshooting
+          <p className="text-sm text-[#8290ab] mt-1">
+            Organizational memory &amp; root-cause diagnosis across 39 industrial assets
           </p>
           {stats?.history_start && stats?.history_end && (
-            <p className="text-xs text-gray-500 mt-1">
-              Synthetic, operationally realistic work-order history · {formatDay(stats.history_start)} –{" "}
-              {formatDay(stats.history_end)} · Hindsight bank {stats.memory_bank}
+            <p className="text-xs text-[#50607d] mt-1.5 font-mono">
+              Operationally verified work-orders · {formatDay(stats.history_start)} – {formatDay(stats.history_end)} · Bank: <span className="text-[#38bdf8] font-mono">{stats.memory_bank}</span>
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => {
+              const el = document.getElementById("slider-dashboard");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth" });
+              } else if (onOpenSliders) {
+                onOpenSliders();
+              }
+            }}
+            className="btn-neon-outline flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-[#38bdf8]" />
+            Interactive Sliders
+          </button>
           {onShowBeforeAfter && (
             <button
               onClick={onShowBeforeAfter}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-industrial-300 text-industrial-700 rounded-lg hover:bg-industrial-50 transition-colors shadow-sm"
+              className="btn-neon-outline flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all"
             >
-              <Brain className="w-5 h-5" />
-              See Memory Impact
+              <Brain className="w-4 h-4 text-[#60a5fa]" />
+              Memory Impact
             </button>
           )}
           <button
             onClick={onReportIncident}
-            className="flex items-center gap-2 px-4 py-2 bg-industrial-600 text-white rounded-lg hover:bg-industrial-700 transition-colors shadow-sm"
+            className="btn-neon-primary flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-all shadow-[0_4px_22px_rgba(59,130,246,0.4)]"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
             Report Incident
           </button>
         </div>
       </div>
 
       {error ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-800">
+        <div className="glass-card rounded-2xl p-5 border border-rose-500/30 text-rose-300 bg-rose-950/20">
           {error}
         </div>
       ) : stats ? (
@@ -139,76 +158,92 @@ export function Dashboard({
             uniqueMachines={stats.unique_machines}
           />
 
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Key Metrics matching the reference cards style */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <MetricCard
-              icon={<Activity className="w-6 h-6" />}
+              icon={<Activity className="w-5 h-5 text-[#38bdf8]" />}
               label="Total Incidents"
               value={stats.total_incidents}
-              sublabel="In organizational memory"
-              color="industrial"
-            />
-            <MetricCard
-              icon={<Clock className="w-6 h-6" />}
-              label="Downtime Logged"
-              value={`${Math.round(stats.total_downtime_hours).toLocaleString()} h`}
-              sublabel={`${memoryDepth}% of incidents have an outcome`}
+              sublabel="In vector hindsight memory"
               color="blue"
             />
             <MetricCard
-              icon={<Target className="w-6 h-6" />}
-              label="Repairs That Worked"
-              value={`${successRate}%`}
-              sublabel="SUCCESS share of recorded outcomes"
-              color="green"
+              icon={<Clock className="w-5 h-5 text-[#60a5fa]" />}
+              label="Downtime Tracked"
+              value={`${Math.round(stats.total_downtime_hours).toLocaleString()} h`}
+              sublabel={`${memoryDepth}% with verified outcomes`}
+              color="cyan"
             />
             <MetricCard
-              icon={<TrendingUp className="w-6 h-6" />}
-              label="Resolution Rate"
+              icon={<Target className="w-5 h-5 text-[#818cf8]" />}
+              label="First-Time Fixes"
+              value={`${successRate}%`}
+              sublabel="SUCCESS share of interventions"
+              color="indigo"
+            />
+            <MetricCard
+              icon={<TrendingUp className="w-5 h-5 text-[#a78bfa]" />}
+              label="Resolution Velocity"
               value={`${failureReduction}%`}
-              sublabel="Success + Partial"
-              color="emerald"
+              sublabel="Effective resolution rate"
+              color="violet"
             />
           </div>
+
+          {/* Interactive Slider Dashboard Centerpiece */}
+          <section id="slider-dashboard" className="pt-2">
+            <SliderDashboard
+              onViewMachineMemory={onViewMachineMemory}
+              onReportIncident={onReportIncident}
+            />
+          </section>
 
           {/* Two-column layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Outcome Distribution */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-5 h-5 text-industrial-600" />
-                <h3 className="text-lg font-semibold text-industrial-900">
-                  Intervention Outcomes
-                </h3>
+            <div className="glass-card p-6 rounded-3xl">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-2xl bg-[#1d4ed8]/20 text-[#38bdf8] border border-[#3b82f6]/30">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">
+                      Intervention Outcomes
+                    </h3>
+                    <p className="text-xs text-[#8290ab]">First-pass resolution reliability</p>
+                  </div>
+                </div>
+                <span className="text-xs text-[#8290ab] font-mono px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/10">{stats.incidents_with_outcome} Verified</span>
               </div>
               {stats.incidents_with_outcome > 0 ? (
                 <div className="space-y-4">
                   <OutcomeRow
-                    label="Success"
+                    label="Success (Fixed First Attempt)"
                     count={stats.outcome_distribution.SUCCESS}
                     total={stats.incidents_with_outcome}
-                    icon={<CheckCircle className="w-4 h-4" />}
-                    color="green"
+                    icon={<CheckCircle className="w-4 h-4 text-[#38bdf8]" />}
+                    color="blue"
                   />
                   <OutcomeRow
-                    label="Partial"
+                    label="Partial (Temporary Mitigation)"
                     count={stats.outcome_distribution.PARTIAL}
                     total={stats.incidents_with_outcome}
-                    icon={<AlertTriangle className="w-4 h-4" />}
+                    icon={<AlertTriangle className="w-4 h-4 text-amber-400" />}
                     color="amber"
                   />
                   <OutcomeRow
-                    label="Failed"
+                    label="Failed (Wrong Component First)"
                     count={stats.outcome_distribution.FAILED}
                     total={stats.incidents_with_outcome}
-                    icon={<XCircle className="w-4 h-4" />}
+                    icon={<XCircle className="w-4 h-4 text-rose-400" />}
                     color="red"
                   />
                   <OutcomeRow
-                    label="Not verified"
+                    label="Under Active Monitoring"
                     count={stats.outcome_distribution.UNKNOWN}
                     total={stats.incidents_with_outcome}
-                    icon={<Activity className="w-4 h-4" />}
+                    icon={<Activity className="w-4 h-4 text-slate-400" />}
                     color="gray"
                   />
                 </div>
@@ -218,15 +253,23 @@ export function Dashboard({
             </div>
 
             {/* Defect Types */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-                <h3 className="text-lg font-semibold text-industrial-900">
-                  Most Frequent Problems
-                </h3>
+            <div className="glass-card p-6 rounded-3xl">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-2xl bg-[#6366f1]/20 text-[#818cf8] border border-[#6366f1]/30">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">
+                      Most Frequent Failure Modes
+                    </h3>
+                    <p className="text-xs text-[#8290ab]">Top recurring machine telemetry anomalies</p>
+                  </div>
+                </div>
+                <span className="text-xs text-[#8290ab] font-mono px-2.5 py-0.5 rounded-full bg-white/[0.04] border border-white/10">Fleet Top 5</span>
               </div>
               {Object.keys(stats.defect_type_distribution).length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   {Object.entries(stats.defect_type_distribution)
                     .sort(([, a], [, b]) => b - a)
                     .slice(0, 5)
@@ -246,16 +289,21 @@ export function Dashboard({
           </div>
 
           {/* Machine Fleet Overview */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Server className="w-5 h-5 text-blue-500" />
-                <h3 className="text-lg font-semibold text-industrial-900">
-                  Machine Fleet Overview
-                </h3>
+          <div className="glass-card p-6 rounded-3xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-2xl bg-[#1d4ed8]/20 text-[#60a5fa] border border-[#3b82f6]/30">
+                  <Server className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Monitored Equipment Families
+                  </h3>
+                  <p className="text-xs text-[#8290ab]">Click any family to inspect hero machine memory</p>
+                </div>
               </div>
-              <span className="text-sm text-industrial-600">
-                {stats.unique_machines} machines with history · click a type to open its hero machine
+              <span className="text-xs font-mono text-[#38bdf8] px-3 py-1 rounded-full bg-[#3b82f6]/15 border border-[#3b82f6]/30 font-semibold">
+                {stats.unique_machines} Assets Online
               </span>
             </div>
             <MachineTypeBreakdown
@@ -299,32 +347,36 @@ function MemoryHealthBanner({
 
   const stages = {
     empty: {
-      title: "Memory is Empty",
-      subtitle: "Report your first incident to start building organizational knowledge",
-      gradient: "from-gray-50 to-gray-100",
-      border: "border-gray-300",
-      icon: <Brain className="w-8 h-8 text-gray-400" />,
+      title: "Memory System Initializing",
+      subtitle: "Submit first field telemetry report to establish organizational vector baseline",
+      glow: "bg-slate-500/10",
+      accent: "text-slate-400",
+      border: "border-white/10",
+      icon: <Brain className="w-6 h-6 text-slate-400" />,
     },
     learning: {
-      title: "TRACE is Learning",
-      subtitle: `Building patterns from ${totalIncidents} incident${totalIncidents !== 1 ? "s" : ""}`,
-      gradient: "from-blue-50 to-indigo-50",
-      border: "border-blue-200",
-      icon: <Brain className="w-8 h-8 text-blue-500" />,
+      title: "TRACE Hindsight Memory Active",
+      subtitle: `Forming associative patterns across ${totalIncidents} incident work orders`,
+      glow: "bg-[#1d4ed8]/15",
+      accent: "text-[#60a5fa]",
+      border: "border-[#3b82f6]/30",
+      icon: <Brain className="w-6 h-6 text-[#60a5fa]" />,
     },
     growing: {
-      title: "Memory Growing",
-      subtitle: `${totalIncidents} incidents across ${uniqueMachines} machines`,
-      gradient: "from-green-50 to-emerald-50",
-      border: "border-green-200",
-      icon: <TrendingUp className="w-8 h-8 text-green-500" />,
+      title: "Fleet Hindsight Memory Expanding",
+      subtitle: `${totalIncidents} incidents catalogued across ${uniqueMachines} industrial machines`,
+      glow: "bg-[#38bdf8]/15",
+      accent: "text-[#38bdf8]",
+      border: "border-[#38bdf8]/30",
+      icon: <TrendingUp className="w-6 h-6 text-[#38bdf8]" />,
     },
     mature: {
-      title: "Rich Memory Available",
-      subtitle: `${totalIncidents} incidents with ${successRate}% success rate`,
-      gradient: "from-emerald-50 to-green-50",
-      border: "border-emerald-200",
-      icon: <Zap className="w-8 h-8 text-emerald-500" />,
+      title: "High-Confidence Memory Established",
+      subtitle: `${totalIncidents} verified work orders retained · ${successRate}% first-time fix rate`,
+      glow: "bg-[#2563eb]/20",
+      accent: "text-[#38bdf8]",
+      border: "border-[#3b82f6]/40",
+      icon: <Zap className="w-6 h-6 text-[#38bdf8]" />,
     },
   };
 
@@ -333,41 +385,53 @@ function MemoryHealthBanner({
   return (
     <div
       className={cn(
-        "bg-gradient-to-r rounded-xl p-6 border",
-        stage.gradient,
+        "glass-card p-6 md:p-8 rounded-3xl relative overflow-hidden border shadow-[0_20px_50px_rgba(0,0,0,0.65)]",
         stage.border
       )}
     >
-      <div className="flex items-start gap-4">
-        <div className="p-3 bg-white rounded-lg shadow-sm">{stage.icon}</div>
-        <div className="flex-1">
-          <h3 className="text-xl font-bold text-gray-900">{stage.title}</h3>
-          <p className="text-gray-600 mt-1">{stage.subtitle}</p>
-          {memoryStage !== "empty" && (
-            <div className="flex flex-wrap gap-4 mt-3">
-              <MemoryChip
-                label="Incidents"
-                value={totalIncidents}
-                icon={<Activity className="w-3 h-3" />}
-              />
-              <MemoryChip
-                label="With Outcomes"
-                value={withOutcome}
-                icon={<CheckCircle className="w-3 h-3" />}
-              />
-              <MemoryChip
-                label="Machines"
-                value={uniqueMachines}
-                icon={<Server className="w-3 h-3" />}
-              />
-              <MemoryChip
-                label="Success Rate"
-                value={`${successRate}%`}
-                icon={<Target className="w-3 h-3" />}
-              />
+      {/* Ambient glow backdrop */}
+      <div className={cn("absolute -top-20 -right-20 w-80 h-80 rounded-full blur-3xl pointer-events-none", stage.glow)} />
+
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="flex items-start gap-4">
+          <div className="p-3.5 rounded-2xl bg-white/[0.05] border border-white/10 text-white shadow-inner">
+            {stage.icon}
+          </div>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-xl font-extrabold text-white tracking-tight">{stage.title}</h3>
+              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-[#3b82f6]/20 text-[#38bdf8] border border-[#3b82f6]/30">
+                Online
+              </span>
             </div>
-          )}
+            <p className="text-sm text-[#8290ab] mt-1">{stage.subtitle}</p>
+          </div>
         </div>
+
+        {memoryStage !== "empty" && (
+          <div className="flex flex-wrap gap-2.5">
+            <MemoryChip
+              label="Incidents"
+              value={totalIncidents}
+              icon={<Activity className="w-3.5 h-3.5 text-[#38bdf8]" />}
+            />
+            <MemoryChip
+              label="Verified Outcomes"
+              value={withOutcome}
+              icon={<CheckCircle className="w-3.5 h-3.5 text-[#60a5fa]" />}
+            />
+            <MemoryChip
+              label="Machines"
+              value={uniqueMachines}
+              icon={<Server className="w-3.5 h-3.5 text-[#818cf8]" />}
+            />
+            <MemoryChip
+              label="Fix Accuracy"
+              value={`${successRate}%`}
+              icon={<Target className="w-3.5 h-3.5 text-cyan-400" />}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -383,10 +447,10 @@ function MemoryChip({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/80 rounded-full text-sm">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-[#f8fafc] backdrop-blur-md">
       {icon}
-      <span className="font-medium text-gray-900">{value}</span>
-      <span className="text-gray-500">{label}</span>
+      <span className="font-bold text-white font-mono">{value}</span>
+      <span className="text-[#8290ab]">{label}</span>
     </div>
   );
 }
@@ -402,24 +466,24 @@ function MetricCard({
   label: string;
   value: number | string;
   sublabel: string;
-  color: "industrial" | "blue" | "green" | "emerald";
+  color: "blue" | "cyan" | "indigo" | "violet";
 }) {
   const colors = {
-    industrial: "bg-industrial-50 text-industrial-600",
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
-    emerald: "bg-emerald-50 text-emerald-600",
+    blue: "bg-[#1d4ed8]/20 text-[#38bdf8] border-[#3b82f6]/35 shadow-[0_0_15px_rgba(59,130,246,0.3)]",
+    cyan: "bg-[#0284c7]/20 text-[#38bdf8] border-[#0ea5e9]/35 shadow-[0_0_15px_rgba(14,165,233,0.3)]",
+    indigo: "bg-[#4338ca]/20 text-[#818cf8] border-[#6366f1]/35 shadow-[0_0_15px_rgba(99,102,241,0.3)]",
+    violet: "bg-[#6d28d9]/20 text-[#a78bfa] border-[#8b5cf6]/35 shadow-[0_0_15px_rgba(139,92,246,0.3)]",
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+    <div className="glass-card glass-card-hover p-6 rounded-3xl relative overflow-hidden">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-gray-600">{label}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
-          <p className="text-xs text-gray-500 mt-1">{sublabel}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#8290ab]">{label}</p>
+          <p className="text-3xl font-extrabold text-white mt-1.5 tracking-tight font-mono">{value}</p>
+          <p className="text-xs text-[#50607d] mt-1.5">{sublabel}</p>
         </div>
-        <div className={cn("p-2 rounded-lg", colors[color])}>{icon}</div>
+        <div className={cn("p-2.5 rounded-2xl border", colors[color])}>{icon}</div>
       </div>
     </div>
   );
@@ -436,47 +500,31 @@ function OutcomeRow({
   count: number;
   total: number;
   icon: React.ReactNode;
-  color: "green" | "amber" | "red" | "gray";
+  color: "blue" | "amber" | "red" | "gray";
 }) {
   const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
 
-  const colors = {
-    green: {
-      bg: "bg-green-500",
-      text: "text-green-700",
-      light: "text-green-500",
-    },
-    amber: {
-      bg: "bg-amber-500",
-      text: "text-amber-700",
-      light: "text-amber-500",
-    },
-    red: {
-      bg: "bg-red-500",
-      text: "text-red-700",
-      light: "text-red-500",
-    },
-    gray: {
-      bg: "bg-gray-400",
-      text: "text-gray-700",
-      light: "text-gray-400",
-    },
+  const barStyles = {
+    blue: "bg-gradient-to-r from-[#2563eb] to-[#38bdf8] shadow-[0_0_12px_rgba(56,189,248,0.45)]",
+    amber: "bg-gradient-to-r from-amber-400 to-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.4)]",
+    red: "bg-gradient-to-r from-rose-500 to-rose-600 shadow-[0_0_12px_rgba(244,63,94,0.4)]",
+    gray: "bg-slate-500",
   };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <span className={colors[color].light}>{icon}</span>
-          <span className="text-sm font-medium text-gray-700">{label}</span>
+          <span>{icon}</span>
+          <span className="text-sm font-medium text-white">{label}</span>
         </div>
-        <span className="text-sm text-gray-600">
+        <span className="text-xs font-mono text-[#8290ab]">
           {count} ({percentage}%)
         </span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
+      <div className="w-full bg-white/[0.06] rounded-full h-2.5 overflow-hidden border border-white/5">
         <div
-          className={cn("h-2 rounded-full", colors[color].bg)}
+          className={cn("h-full rounded-full transition-all duration-500", barStyles[color])}
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -495,7 +543,6 @@ function DefectRow({
 }) {
   const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
 
-  // Format defect name
   const formattedDefect = defect
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -503,16 +550,16 @@ function DefectRow({
 
   return (
     <div className="flex items-center gap-3">
-      <span className="w-32 text-sm text-gray-700 truncate" title={formattedDefect}>
+      <span className="w-36 text-sm text-[#f8fafc] truncate font-medium" title={formattedDefect}>
         {formattedDefect}
       </span>
-      <div className="flex-1 bg-gray-200 rounded-full h-3">
+      <div className="flex-1 bg-white/[0.06] rounded-full h-2.5 overflow-hidden border border-white/5">
         <div
-          className="bg-amber-500 h-3 rounded-full"
-          style={{ width: `${Math.max(percentage, 5)}%` }}
+          className="bg-gradient-to-r from-[#6366f1] to-[#a855f7] h-full rounded-full shadow-[0_0_8px_rgba(168,85,247,0.4)]"
+          style={{ width: `${Math.max(percentage, 6)}%` }}
         />
       </div>
-      <span className="text-sm font-medium text-gray-700 w-16 text-right">
+      <span className="text-xs font-mono text-[#8290ab] w-16 text-right">
         {count} ({percentage}%)
       </span>
     </div>
@@ -530,11 +577,11 @@ function MachineTypeBreakdown({
 }) {
   const types = fleet?.machine_types ?? [];
   if (types.length === 0) {
-    return <EmptyState message="Loading fleet..." />;
+    return <EmptyState message="Loading fleet assets..." />;
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
       {types.map((type) => {
         const incidentCount = distribution[type.machine_type] ?? 0;
         const target = type.hero_machine_id ?? type.machines[0]?.machine_id;
@@ -542,19 +589,23 @@ function MachineTypeBreakdown({
           <button
             key={type.machine_type}
             onClick={() => target && onViewMachine(target)}
-            className="bg-gray-50 hover:bg-gray-100 rounded-lg p-4 text-left transition-colors group"
+            className="glass-card glass-card-hover rounded-2xl p-4 text-left transition-all group"
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-blue-500">
-                <Server className="w-5 h-5" />
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="p-2 rounded-xl bg-[#1d4ed8]/20 text-[#60a5fa] border border-[#3b82f6]/30">
+                <Server className="w-4 h-4" />
               </span>
-              <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ArrowRight className="w-4 h-4 text-[#8290ab] group-hover:text-[#38bdf8] group-hover:translate-x-1 transition-all" />
             </div>
-            <p className="font-medium text-gray-900">{humanize(type.label)}</p>
-            <p className="text-sm text-gray-500">
-              {incidentCount} incident{incidentCount !== 1 ? "s" : ""} · {type.machines.length} machines
+            <p className="font-bold text-white text-sm group-hover:text-[#38bdf8] transition-colors">{humanize(type.label)}</p>
+            <p className="text-xs text-[#8290ab] mt-1">
+              {incidentCount} work orders · {type.machines.length} assets
             </p>
-            {target && <p className="text-xs text-industrial-600 mt-1">Open {target}</p>}
+            {target && (
+              <span className="inline-block mt-2 text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#3b82f6]/15 text-[#38bdf8] border border-[#3b82f6]/30">
+                Hero: {target}
+              </span>
+            )}
           </button>
         );
       })}
@@ -571,48 +622,27 @@ function MemoryValueCard({
   successRate: number;
   onReportIncident: () => void;
 }) {
-  if (incidents >= 10) {
-    // Memory is valuable
-    return (
-      <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-6 text-white">
-        <div className="flex items-center gap-3 mb-3">
-          <Zap className="w-6 h-6" />
-          <h3 className="text-xl font-bold">Memory is Working</h3>
-        </div>
-        <p className="text-green-100 mb-4">
-          TRACE has built significant organizational knowledge. New incidents will
-          benefit from {incidents} historical cases with a {successRate}% success
-          rate.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={onReportIncident}
-            className="px-4 py-2 bg-white text-green-700 rounded-lg font-medium hover:bg-green-50 transition-colors"
-          >
-            Report New Incident
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Memory is building
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
-      <div className="flex items-center gap-3 mb-3">
-        <Brain className="w-6 h-6" />
-        <h3 className="text-xl font-bold">Build Your Memory</h3>
-      </div>
-      <p className="text-blue-100 mb-4">
-        Every resolved incident makes TRACE smarter. Record outcomes to help future
-        engineers benefit from your experience.
-      </p>
-      <div className="flex gap-3">
+    <div className="glass-card p-6 md:p-8 rounded-3xl relative overflow-hidden border border-[#3b82f6]/35 shadow-[0_0_40px_rgba(59,130,246,0.15)]">
+      <div className="absolute -top-24 -right-24 w-80 h-80 bg-[#1d4ed8]/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2.5 mb-2">
+            <div className="p-2 rounded-xl bg-[#3b82f6]/20 text-[#38bdf8] border border-[#3b82f6]/40 shadow-[0_0_12px_rgba(59,130,246,0.3)]">
+              <Zap className="w-5 h-5" />
+            </div>
+            <h3 className="text-xl font-extrabold text-white">Closed-Loop Vector Memory</h3>
+          </div>
+          <p className="text-sm text-[#8290ab] max-w-2xl leading-relaxed">
+            Every verified repair is permanently retained into Hindsight vector memory. Next time an operator encounters identical vibration or pressure telemetry on any monitored line, the engine predicts the verified resolution instantly.
+          </p>
+        </div>
         <button
           onClick={onReportIncident}
-          className="px-4 py-2 bg-white text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+          className="btn-neon-primary px-6 py-3 text-sm font-bold whitespace-nowrap self-start md:self-auto flex items-center gap-2 shadow-[0_0_22px_rgba(59,130,246,0.45)]"
         >
-          Report Incident
+          <Plus className="w-4 h-4" />
+          Report Machine Incident
         </button>
       </div>
     </div>
@@ -621,8 +651,8 @@ function MemoryValueCard({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-      <Activity className="w-8 h-8 mb-2" />
+    <div className="flex flex-col items-center justify-center py-10 text-[#50607d]">
+      <Activity className="w-8 h-8 mb-2 text-[#8290ab]" />
       <p className="text-sm">{message}</p>
     </div>
   );
