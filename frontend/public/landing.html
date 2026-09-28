@@ -634,10 +634,10 @@
           <a href="#features">Features</a>
           <a href="#solutions">Telemetry &amp; Operations</a>
           <a href="#stats">Fleet Impact</a>
-          <a href="http://localhost:3000/?view=sliders">ROI Sliders</a>
-          <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">API Docs</a>
+          <a href="/?view=sliders">ROI Sliders</a>
+          <a href="/api-docs" target="_blank" rel="noreferrer">API Docs</a>
         </div>
-        <a href="http://localhost:3000/?view=dashboard" class="btn btn-ghost">Launch Console</a>
+        <a href="/?view=dashboard" class="btn btn-ghost">Launch Console</a>
       </nav>
 
       <div class="hero-inner">
@@ -648,14 +648,14 @@
           Drive factory uptime forward with persistent Hindsight memory, deterministic root-cause scoring, and verified repair history — all in one adaptive context engine.
         </p>
         <div class="hero-actions" data-reveal style="--rd:300ms">
-          <a href="http://localhost:3000/?view=dashboard" class="btn btn-primary">
+          <a href="/?view=dashboard" class="btn btn-primary">
             <span>Launch Plant Console</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12h14"></path>
               <path d="m12 5 7 7-7 7"></path>
             </svg>
           </a>
-          <a href="http://localhost:3000/?view=report" class="btn btn-outline">Report Machine Incident</a>
+          <a href="/?view=report" class="btn btn-outline">Report Machine Incident</a>
         </div>
       </div>
 
@@ -774,14 +774,14 @@
             Every work order, every sensor anomaly, every downtime hour — tracked live. TRACE gives plant engineers the altitude to spot failure clusters and the memory to fix them on the first attempt.
           </p>
           <div data-reveal style="--rd:270ms; margin-top:28px; display:flex; gap:12px; flex-wrap:wrap;">
-            <a href="http://localhost:3000/?view=dashboard" class="btn btn-primary">
+            <a href="/?view=dashboard" class="btn btn-primary">
               <span>Launch Plant Console</span>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14"></path>
                 <path d="m12 5 7 7-7 7"></path>
               </svg>
             </a>
-            <a href="http://localhost:3000/?view=sliders" class="btn btn-outline">Explore ROI Sliders</a>
+            <a href="/?view=sliders" class="btn btn-outline">Explore ROI Sliders</a>
           </div>
         </div>
 
@@ -856,15 +856,15 @@
           Experience live adaptive memory across 39 industrial machines or submit a new telemetry report to test root-cause resolution in real time.
         </p>
         <div class="hero-actions" data-reveal style="--rd:300ms; margin-top:32px;">
-          <a href="http://localhost:3000/?view=dashboard" class="btn btn-primary">
+          <a href="/?view=dashboard" class="btn btn-primary">
             <span>Enter Plant Console</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12h14"></path>
               <path d="m12 5 7 7-7 7"></path>
             </svg>
           </a>
-          <a href="http://localhost:3000/?view=report" class="btn btn-outline">Report an Incident</a>
-          <a href="http://localhost:3000/?view=sliders" class="btn btn-outline">ROI Sliders</a>
+          <a href="/?view=report" class="btn btn-outline">Report an Incident</a>
+          <a href="/?view=sliders" class="btn btn-outline">ROI Sliders</a>
         </div>
       </div>
 
@@ -881,25 +881,25 @@
           <div class="footer-col">
             <h4>Console</h4>
             <ul>
-              <li><a href="http://localhost:3000/?view=dashboard">Fleet Dashboard</a></li>
-              <li><a href="http://localhost:3000/?view=report">Report Incident</a></li>
-              <li><a href="http://localhost:3000/?view=sliders">ROI Sliders</a></li>
-              <li><a href="http://localhost:3000/?view=memory">Machine Memory</a></li>
+              <li><a href="/?view=dashboard">Fleet Dashboard</a></li>
+              <li><a href="/?view=report">Report Incident</a></li>
+              <li><a href="/?view=sliders">ROI Sliders</a></li>
+              <li><a href="/?view=memory">Machine Memory</a></li>
             </ul>
           </div>
           <div class="footer-col">
             <h4>Hero Fleet</h4>
             <ul>
-              <li><a href="http://localhost:3000/?view=memory&machine=CNC-204">CNC-204 (Spindle)</a></li>
-              <li><a href="http://localhost:3000/?view=memory&machine=HP-303">HP-303 (Pressure)</a></li>
-              <li><a href="http://localhost:3000/?view=memory&machine=CV-507">CV-507 (Tracking)</a></li>
+              <li><a href="/?view=memory&machine=CNC-204">CNC-204 (Spindle)</a></li>
+              <li><a href="/?view=memory&machine=HP-303">HP-303 (Pressure)</a></li>
+              <li><a href="/?view=memory&machine=CV-507">CV-507 (Tracking)</a></li>
             </ul>
           </div>
           <div class="footer-col">
             <h4>System</h4>
             <ul>
-              <li><a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">FastAPI Swagger</a></li>
-              <li><a href="http://localhost:8000/api/dashboard/stats" target="_blank" rel="noreferrer">Live Stats API</a></li>
+              <li><a href="/api-docs" target="_blank" rel="noreferrer">FastAPI Swagger</a></li>
+              <li><a href="/api/dashboard/stats" target="_blank" rel="noreferrer">Live Stats API</a></li>
               <li><a href="#">Hindsight Bank</a></li>
             </ul>
           </div>
@@ -1813,6 +1813,18 @@
           window.parent.postMessage({ action: "navigate", view: "report" }, "*");
         }
       });
+    });
+
+    // Dynamic API URL based on environment
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const apiBase = isLocal ? 'http://localhost:8000' : 'https://trace-api-60le.onrender.com';
+
+    // Fix API docs links
+    document.querySelectorAll('a[href="/api-docs"]').forEach(el => {
+      el.href = apiBase + '/docs';
+    });
+    document.querySelectorAll('a[href="/api/dashboard/stats"]').forEach(el => {
+      el.href = apiBase + '/api/dashboard/stats';
     });
   </script>
 </body>
