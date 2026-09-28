@@ -13,10 +13,12 @@ import time
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.core.errors import describe_memory_error
 from app.data.catalog import HERO_MACHINES, fleet_summary
 from app.db.database import engine
 from app.hindsight import MemoryService
 from app.hindsight.client import HindsightClient
+from app.hindsight.memory import MEMORY_STATUS
 from app.models import IncidentCreate
 from app.services import AnalysisService
 
@@ -102,9 +104,18 @@ async def health_check() -> Dict[str, Any]:
         await asyncio.wait_for(client.check_bank(), timeout=8)
         checks["hindsight"] = {"ok": True, "bank": client.bank_id}
     except Exception as exc:
-        checks["hindsight"] = {"ok": False, "bank": client.bank_id, "error": str(exc)[:200] or type(exc).__name__}
+        checks["hindsight"] = {"ok": False, "bank": client.bank_id, "error": describe_memory_error(exc)}
     finally:
         await client.close()
+
+    # Reading the bank config can succeed while recall/retain are refused
+    # (e.g. no credits), so also report the last real memory failure.
+    if checks["hindsight"]["ok"] and MEMORY_STATUS["last_error"]:
+        checks["hindsight"] = {
+            "ok": False,
+            "bank": client.bank_id,
+            "error": f"Last memory call failed: {MEMORY_STATUS['last_error']}",
+        }
 
     checks["llm"] = {"ok": bool(settings.groq_api_key), "model": settings.llm_model if settings.groq_api_key else None}
 

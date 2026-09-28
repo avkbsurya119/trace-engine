@@ -1072,7 +1072,9 @@ def fleet_summary() -> Dict[str, Any]:
                 ),
             }
             for machine_type, spec in FLEET.items()
-        ]
+        ],
+        "demo_presets": DEMO_PRESETS,
+        "demo_outcome": DEMO_OUTCOME,
     }
 
 
@@ -1123,3 +1125,70 @@ HERO_MACHINES: List[Dict[str, Any]] = [
         },
     },
 ]
+
+
+# One-click incidents for the live demo (Report Incident form). The same
+# records drive scripts/demo.py, so the UI demo and the scripted demo match.
+DEMO_PRESETS: List[Dict[str, Any]] = [
+    {
+        "key": "demo-new-problem",
+        "label": "Demo 1: new problem, no history (AC-407)",
+        "incident": {
+            "machine_id": "AC-407",
+            "machine_type": "Screw_Air_Compressor",
+            "production_line": "Utilities - Molding Hall",
+            "defect_type": "condensate_drain_failure",
+            "symptoms": ["water in compressed air line", "auto drain not cycling"],
+            "sensor_values": {"discharge_pressure_bar": 7.5, "discharge_temp_c": 82},
+            "description": "Water spitting from the air drops at the molding hall. Electronic drain on the wet receiver is not cycling; manual test button does nothing.",
+            "operating_hours": 1180,
+            "technician_id": "T-138",
+        },
+    },
+    {
+        "key": "demo-repeat-problem",
+        "label": "Demo 2: same problem again (AC-407)",
+        "incident": {
+            "machine_id": "AC-407",
+            "machine_type": "Screw_Air_Compressor",
+            "production_line": "Utilities - Molding Hall",
+            "defect_type": "condensate_drain_failure",
+            "symptoms": ["water in compressed air line", "wet receiver tank level high"],
+            "sensor_values": {"discharge_pressure_bar": 7.5, "discharge_temp_c": 82},
+            "description": "Moisture again at molding hall drops and the wet receiver sight glass is almost full; drain does not seem to discharge.",
+            "operating_hours": 1630,
+            "technician_id": "T-126",
+        },
+    },
+    {
+        "key": "demo-conflicting",
+        "label": "Conflicting history (CNC-204 spindle vibration)",
+        "incident": {**HERO_MACHINES[0]["incident"], "technician_id": "T-117", "operating_hours": 35120},
+    },
+    {
+        "key": "demo-strong",
+        "label": "Strong history (CV-505 roller noise)",
+        "incident": {
+            "machine_id": "CV-505",
+            "machine_type": "Belt_Conveyor",
+            "production_line": "Assembly Line 3",
+            "defect_type": "roller_bearing_noise",
+            "symptoms": ["squealing roller", "grinding noise along conveyor"],
+            "sensor_values": {"bearing_vibration_mm_s": 6.9, "belt_speed_m_s": 1.45},
+            "description": "Squealing and grinding from the mid-section rollers since start of shift, louder under load.",
+            "operating_hours": 16240,
+            "technician_id": "T-141",
+        },
+    },
+]
+
+# Outcome recorded between Demo 1 and Demo 2 (used by scripts/demo.py and shown as a hint in the UI).
+DEMO_OUTCOME: Dict[str, Any] = {
+    "intervention_category": "Condensate drain replacement",
+    "action_taken": "Replaced zero-loss condensate drain on wet receiver and cleaned inlet strainer",
+    "action_outcome": "SUCCESS",
+    "confirmed_root_cause": "Drain inlet strainer blocked with rust and pipe sludge from new installation; valve could not discharge",
+    "resolution_time_minutes": 55,
+    "downtime_minutes": 90,
+    "technician_notes": "Old drain full of rust flakes from the new receiver pipework. Fitted new drain, blew down receiver. Dry air at drops after 1 h.",
+}

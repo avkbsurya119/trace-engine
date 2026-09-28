@@ -89,3 +89,65 @@ def test_example_action_is_most_recent_success():
 def test_warns_when_no_history_on_this_machine():
     rec = engine.generate_recommendation(CURRENT, [past("WO-1", "Bearings", "SUCCESS")])
     assert any("No earlier record of this problem on CNC-204" in w for w in rec.warnings)
+
+
+# ---------------------------------------------------------------- explainability
+
+def _checks(rec):
+    return {(c.level, c.rule.split(" (")[0]): c.passed for c in rec.confidence_checks}
+
+
+def test_confidence_checks_explain_high():
+    evidence = [past(f"WO-{i}", "Bearings", "SUCCESS", days=i) for i in range(3)] + [past("WO-9", "Bearings", "FAILED", days=9)]
+    rec = engine.generate_recommendation(CURRENT, evidence)
+    levels = {c.level for c in rec.confidence_checks}
+    assert levels == {"HIGH", "MEDIUM", "DOWNGRADE"}
+    high = [c for c in rec.confidence_checks if c.level == "HIGH"]
+    assert high[0].passed and high[1].passed and "3 of 4 = 75%" in high[1].detail
+
+
+def test_confidence_checks_show_why_not_high():
+    evidence = [past("WO-1", "Bearings", "SUCCESS"), past("WO-2", "Bearings", "SUCCESS", days=1), past("WO-3", "Bearings", "FAILED", days=2)]
+    rec = engine.generate_recommendation(CURRENT, evidence)
+    assert rec.confidence == "MEDIUM"
+    by_level = {}
+    for c in rec.confidence_checks:
+        by_level.setdefault(c.level, []).append(c.passed)
+    assert by_level["HIGH"] == [False, False, False]
+    assert by_level["MEDIUM"] == [True]
+
+
+def test_no_evidence_has_single_failed_evidence_check():
+    rec = engine.generate_recommendation(CURRENT, [])
+    assert [(c.level, c.passed) for c in rec.confidence_checks] == [("EVIDENCE", False)]
+
+
+def test_only_failures_checks_explain_withholding():
+    rec = engine.generate_recommendation(CURRENT, [past("WO-1", "Alignment", "FAILED")])
+    assert [(c.level, c.passed) for c in rec.confidence_checks] == [("EVIDENCE", True), ("EVIDENCE", False)]
+    assert rec.evidence[0].verdict == "rejected"
+    assert rec.evidence[0].verdict_reason == "Never worked: failed 1 of 1 attempt(s)"
+
+
+def test_every_alternative_gets_a_reason():
+    evidence = [
+        past("WO-1", "Bearings", "SUCCESS"), past("WO-2", "Bearings", "SUCCESS", days=1),
+        past("WO-3", "Alignment", "FAILED", days=2), past("WO-4", "Alignment", "FAILED", days=3),
+        past("WO-5", "Relube", "PARTIAL", days=4),
+        past("WO-6", "Holder", "SUCCESS", days=5), past("WO-7", "Holder", "FAILED", days=6), past("WO-8", "Holder", "FAILED", days=7),
+        past("WO-9", "Coolant", "SUCCESS", days=8),
+    ]
+    rec = engine.generate_recommendation(CURRENT, evidence)
+    reasons = {e.intervention_category: (e.verdict, e.verdict_reason) for e in rec.evidence}
+    assert reasons["Bearings"] == ("selected", "Highest score among interventions that have worked")
+    assert reasons["Alignment"][1] == "Never worked: failed 2 of 2 attempt(s)"
+    assert reasons["Relube"][1] == "No verified success (1 partial, 0 unverified)"
+    assert reasons["Holder"][1] == "Failed more often than it worked (2 vs 1)"
+    assert reasons["Coolant"][1] == "Lower score (1 vs 2)"
+    assert [e for e in rec.evidence if e.verdict == "selected"] == [rec.evidence[0]]
+
+
+def test_attempts_and_success_rate_exclude_unknown():
+    evidence = [past("WO-1", "Bearings", "SUCCESS"), past("WO-2", "Bearings", "UNKNOWN", days=1), past("WO-3", "Bearings", "FAILED", days=2)]
+    summary = RecommendationEngine.tally(CURRENT, evidence)[0]
+    assert summary.attempts == 2 and summary.success_rate == 0.5
