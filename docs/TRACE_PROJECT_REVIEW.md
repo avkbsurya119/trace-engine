@@ -1,546 +1,601 @@
 # TRACE — Technical Review Brief
 
-> Prepared for an external reviewer (human or AI) who has **not** opened the repository.
-> State described: `main` at commit `e47f607` (merge of PR #7). Secrets in `.env` are deliberately omitted.
-> Purpose: enable architecture critique, judging feedback, UI suggestions and demo recommendations.
+> For an external reviewer (human or AI) who has **not** opened the repository.
+> State described: `main` after the TRACE Intelligence, enterprise-polish and dark-glass redesign work (PRs #7–#10), deployed on Render.
+> Secrets in `.env` are deliberately omitted.
+> Purpose: architecture critique, judging feedback, UI suggestions and demo recommendations.
+>
+> **Live:** app https://trace-frontend-i5gp.onrender.com/ · API https://trace-api-60le.onrender.com (`/docs`, `/api/dashboard/health`)
 
 ---
 
 # 1. Project Overview
 
-**TRACE — Troubleshooting & Root-Cause Adaptive Context Engine** is a maintenance-troubleshooting assistant for manufacturing plants. A technician reports a machine fault; TRACE recalls how similar faults were handled before (on this machine and on the rest of the fleet of the same equipment type), shows which interventions worked and which failed, recommends the intervention with the best recorded track record, states how confident it is and why, and — once the technician records what they actually did — remembers that outcome for the next similar incident.
+**TRACE (Troubleshooting & Root-Cause Adaptive Context Engine)** is a troubleshooting assistant for maintenance teams in manufacturing plants. It works like this:
 
-**Problem statement.** In real plants, the knowledge of "what fixed this last time" lives in scattered CMMS work orders and in the heads of senior technicians. Recurring faults get re-diagnosed from scratch; cheap-but-wrong fixes get repeated (e.g. re-aligning a spindle that actually has failing bearings); failed attempts are rarely surfaced when the same symptom returns. Downtime is expensive, and trial and error is the main source of wasted downtime.
+1. A technician reports a machine fault.
+2. TRACE recalls how similar faults were handled before, both on this machine and on the rest of the fleet of the same equipment type.
+3. It shows which interventions worked and which failed, and recommends the one with the best recorded track record.
+4. It says how confident it is and why.
+5. Once the technician records what they actually did, TRACE remembers that outcome for the next similar incident.
 
-**Target users.**
-- Maintenance technicians on the floor (primary): report, get guidance, record outcome.
-- Maintenance leads / reliability engineers: review machine histories, recurring defects, what has and hasn't worked.
-- Plant management (secondary): downtime and outcome overview on the dashboard.
+A read-only **TRACE Intelligence** page shows what the plant has learned over time.
 
-**Business value.**
-- Fewer repeat failed interventions → less downtime per incident.
+**Problem.** In real plants, "what fixed this last time" lives in scattered CMMS work orders and in senior technicians' heads.
+
+- Recurring faults get diagnosed from scratch again.
+- Cheap but wrong fixes get repeated.
+- Failed attempts are rarely surfaced when the symptom comes back.
+
+Trial and error is the main source of wasted downtime.
+
+**Users.**
+
+- **Technicians** (primary): report a fault, get guidance, record the outcome.
+- **Maintenance leads and reliability engineers:** review machine histories, recurring problems and reliable repairs.
+- **Plant management:** the dashboard, the ROI view and the knowledge-growth view.
+
+**Value.**
+
+- Fewer repeated failed interventions.
 - Institutional memory that survives staff turnover.
-- Evidence-backed recommendations that are auditable (every claim links to a specific past work order).
-- Honest behaviour on novel problems (no recommendation instead of a guess), which matters for safety-critical equipment.
+- Auditable recommendations, where every claim links to a work order.
+- Honest behaviour on novel problems: no recommendation rather than a guess.
 
-**Why the project exists.** It was built for a hackathon ("AI Agents That Learn Using Hindsight", HackwithHyderabad 3.0) whose brief requires Hindsight (Vectorize's agent-memory service) as the memory layer. Published judging weights: Innovation 30%, Use of Hindsight Memory 25%, Technical Implementation 20%, User Experience 15%, Real-world Impact 10%. The brief explicitly asks for a clear before/after-memory story visible within 60 seconds. Submission content (articles) must not mention the word "hackathon" — the README and app were written accordingly.
+**Context.** TRACE was built for "AI Agents That Learn Using Hindsight" (HackwithHyderabad 3.0), which requires Hindsight (Vectorize's agent-memory service) as the memory layer.
+
+- **Judging weights:** Innovation 30 %, Use of Hindsight Memory 25 %, Technical Implementation 20 %, User Experience 15 %, Real-world Impact 10 %.
+- **Brief requirement:** a clear before/after-memory story within 60 seconds.
 
 ---
 
 # 2. Architecture
 
 ```
-┌──────────────────────── Browser (Next.js 14, React 18, Tailwind) ────────────────────────┐
-│ Sidebar (live health) · Dashboard · Report Incident · Incident Analysis · Machine Memory │
-│ Before/After Memory modal                      lib/api.ts (fetch wrapper)               │
+┌──────────── Browser (Next.js 14, React 18, Tailwind, dark navy glass theme) ─────────────┐
+│ landing.html (Three.js, iframe) → Sidebar (live health) · Dashboard · Report Incident ·   │
+│ Incident Analysis · Machine Memory · TRACE Intelligence · Adaptive Intelligence & ROI     │
+│ Before/After Memory modal            lib/api.ts (typed fetch client, GET cache)           │
 └───────────────────────────────────────┬──────────────────────────────────────────────────┘
-                                        │ JSON over HTTP  (NEXT_PUBLIC_API_URL, default :8000/api)
+                                        │ JSON over HTTP (NEXT_PUBLIC_API_URL)
 ┌───────────────────────────────────────▼──────────────────────────────────────────────────┐
 │ FastAPI (main.py) — CORS, JSON error handlers                                            │
-│  routers: /api/incidents/*   /api/dashboard/*                                            │
-│  services: AnalysisService ─┬─ MemoryService (hindsight/memory.py) ─┬─ IncidentRepository│
-│                             │                                        │   (SQLite, async) │
-│                             │                                        └─ HindsightClient  │
-│                             ├─ select_evidence (relevance gate)          (hindsight-client│
-│                             ├─ RecommendationEngine (deterministic)       SDK)            │
-│                             └─ ReasoningPhraser (Groq via OpenAI SDK)                     │
-│  data: catalog.py (fleet model, hero machines) · generator.py (synthetic history)        │
+│  routers: /api/incidents/*   /api/dashboard/*   /api/intelligence*                       │
+│  AnalysisService ─┬─ MemoryService ─┬─ IncidentRepository (SQLite, async)                │
+│                   │                 └─ HindsightClient (hindsight-client SDK)            │
+│                   ├─ select_evidence (relevance gate + recency)                          │
+│                   ├─ RecommendationEngine (deterministic, confidence checks, verdicts)   │
+│                   └─ ReasoningPhraser (Groq via OpenAI SDK, validated)                   │
+│  IntelligenceService (read-only: replay, knowledge per problem, Wilson ranking, cache)   │
+│  data: catalog.py (fleet model, hero machines, demo presets) · generator.py              │
 └──────────────┬──────────────────────────────┬──────────────────────────────┬────────────┘
                ▼                              ▼                              ▼
      SQLite (trace.db)              Hindsight Cloud bank              Groq (openai/gpt-oss-120b)
-     exact structured records       "trace-maintenance"               wording only, optional
+     exact records, source of truth  trace-manufacturing (Render)      wording only, optional
+                                     trace-maintenance (local default)
 ```
 
-**Component responsibilities**
-- **Frontend** — presentation and form input only. It holds no business logic about recommendations; every number shown comes from an API response.
-- **Backend (FastAPI)** — orchestrates the pipeline, owns all decisions.
-- **SQLite** — the source of truth for every structured field (IDs, outcomes, downtime, timestamps, sensor values). Dashboard stats and machine timelines are computed from SQLite only.
-- **Hindsight** — semantic memory. Every incident is retained as a narrative document; recall finds similar past incidents by meaning. Recall results are never trusted for structured facts — they are mapped back to SQLite rows by `document_id`.
-- **Groq** — optional; rewrites an already-computed result into 2–4 readable sentences. It never chooses the action or confidence.
+**Responsibilities.**
 
-**Request lifecycle (analyze an incident)**
-1. Browser `POST /api/incidents/analyze` with the report.
-2. Pydantic validates (empty required strings → 422).
-3. `AnalysisService` creates an incident ID and timestamp.
-4. **Recall first** (so the new incident cannot match itself): two parallel Hindsight `recall()` calls (fleet-of-type and this-machine), facts grouped by `document_id`, rows loaded from SQLite, incidents without an outcome dropped.
-5. **Relevance gate** (deterministic) keeps the evidence set.
-6. **Store** the new incident: SQLite insert, then Hindsight retain; if retain fails the SQLite row is deleted and a 503 is returned.
-7. **Score** (deterministic) → recommendation, confidence, basis sentence, warnings, per-intervention tallies.
-8. **Phrase** (Groq) → reasoning text, validated; on any problem, the deterministic text is kept.
-9. Response `AnalysisResult` → UI.
+- **Frontend:** presentation and input only. Every number comes from an API response, except the explicitly illustrative ROI simulator and learning scrubber (§4).
+- **FastAPI:** runs the pipeline and makes every decision.
+- **SQLite:** the truth for structured fields. Stats, timelines and Intelligence are computed only from SQLite.
+- **Hindsight:** semantic memory. Recall results are mapped back to SQLite rows by `document_id`.
+- **Groq:** optional. It rewrites a computed result and never chooses the action or confidence.
 
-Outcome recording (`PATCH /outcome`) updates SQLite, then re-retains the Hindsight document with `update_mode="replace"`; a failed retain rolls the SQLite change back.
+**Analyze lifecycle.**
+
+1. `POST /api/incidents/analyze` arrives, and Pydantic validates it.
+2. **Recall first**, so the new incident can't match itself. Two parallel recalls run: the fleet of the type and this machine. Facts are grouped by `document_id`, rows are loaded from SQLite, and incidents without an outcome are dropped.
+3. The **relevance gate** runs, followed by recency annotation.
+4. **Store:** the SQLite insert happens, then the Hindsight retain. If the retain fails, the row is deleted and the API returns 503.
+5. **Score:** recommendation, confidence, `confidence_checks`, per-intervention verdicts, warnings, pattern and cross-machine insights.
+6. **Phrase** with Groq, validate, and fall back to deterministic text if needed.
+7. Return `AnalysisResult`.
+
+`PATCH /outcome` updates SQLite, then re-retains the document with `update_mode="replace"`. If that write fails, the SQLite change is rolled back.
+
+**Deployment.** Render blueprint `render.yaml` (free plan, Oregon):
+
+- `trace-api` (Python 3.11) runs `bash start.sh`, which creates the tables, seeds if the DB is empty, then starts uvicorn.
+- `trace-frontend` (Node 20) runs `npm run build` then `npm start`.
+- Keys are Render secrets.
+- The filesystem is ephemeral, so a redeploy reseeds SQLite and recreates the Hindsight bank.
 
 ---
 
 # 3. Folder Structure
 
-| Path | Why it exists |
+| Path | Purpose |
 |---|---|
-| `README.md` | Accurate project documentation: pipeline, Hindsight usage, dataset, hero machines, config, API table, testing, limitations. |
-| `DEMO.md` | Six-scene live demo script with expected outputs and CLI equivalents. |
-| `docs/` | The hackathon problem statement and content-submission guide (.docx); this review brief. |
-| `backend/main.py` | FastAPI app, CORS, exception handlers, router registration, DB init on startup. |
-| `backend/app/api/` | HTTP routers: `incidents.py` (analyze, get, outcome, machine memory), `dashboard.py` (stats, fleet, hero-machines, health). |
-| `backend/app/core/` | `config.py` (pydantic-settings from `.env`), `errors.py` (`MemoryUnavailableError`). |
-| `backend/app/models/` | Pydantic schemas shared by API and services (`incident.py`). |
-| `backend/app/db/` | SQLAlchemy async engine/session, ORM table, repository (all SQL). |
-| `backend/app/hindsight/` | `client.py` (thin SDK wrapper), `memory.py` (narratives, tags, retain/recall orchestration, stats). |
-| `backend/app/services/` | `analysis.py` (pipeline, relevance gate, machine memory, memory-impact dry run), `recommendation.py` (scoring), `phrasing.py` (LLM wording + guards). |
-| `backend/app/data/` | `catalog.py` (fleet model: machine types, machines, defects, causes, interventions, technicians, hero machines), `generator.py` (deterministic synthetic history). |
-| `backend/seed_data.py` | Rebuilds SQLite and the Hindsight bank from the generator. |
-| `backend/scripts/` | Operational tooling: `validate_scenarios.py` (6 live scenarios with assertions), `demo.py` (scripted before/after demo + reset), `audit_data.py` (data-quality audit), `scenarios.py` (scenario definitions). |
-| `backend/tests/` | Pytest suite: offline tests with an in-memory Hindsight fake, plus opt-in live tests. |
-| `frontend/src/app/` | Next.js App Router: `layout.tsx` (font, metadata), `page.tsx` (the single page; view switching), `globals.css`. |
-| `frontend/src/components/` | All screens: Sidebar, Dashboard, ReportIncident, IncidentAnalysis, MachineMemory, BeforeAfterMemory. |
-| `frontend/src/lib/` | `api.ts` (typed API client), `utils.ts` (class merging, formatting, colour helpers). |
-| `frontend/src/types/` | `incident.ts` — TypeScript mirror of backend responses (also used by the backend contract test). |
-
-Approximate size: ~8,400 lines across backend Python, scripts, tests and frontend TS/TSX.
+| `README.md` · `DEMO.md` · `docs/` | Project docs, demo script, this brief, hackathon statement and content guide (.docx) |
+| `render.yaml` | Render blueprint for both services |
+| `backend/main.py` · `start.sh` | FastAPI app (CORS, handlers, routers, startup DB init); deploy start script |
+| `backend/app/api/` | `incidents.py`, `dashboard.py` (stats, fleet, hero-machines, health), `intelligence.py` |
+| `backend/app/core/` | `config.py` (pydantic-settings), `errors.py` (`MemoryUnavailableError`, readable SDK error text) |
+| `backend/app/models/` | Pydantic schemas (`incident.py`) |
+| `backend/app/db/` | Async SQLAlchemy engine, ORM table, repository |
+| `backend/app/hindsight/` | `client.py` (SDK wrapper), `memory.py` (narratives, tags, retain/recall, rollback, stats) |
+| `backend/app/services/` | `analysis.py` (pipeline, gate, insights, machine memory, hero dry run), `recommendation.py`, `phrasing.py`, `intelligence.py` |
+| `backend/app/data/` | `catalog.py` (fleet, defects → causes → interventions, technicians, hero machines, demo presets), `generator.py` |
+| `backend/seed_data.py` · `scripts/` | Rebuild SQLite + bank; `validate_scenarios.py`, `demo.py`, `audit_data.py`, `scenarios.py` |
+| `backend/tests/` | 73 offline tests + 4 live; `fakes.py` (Hindsight fake), `ts_contract.py` (TS interface reader) |
+| `frontend/public/` | `landing.html` / `ascend.html` (Three.js landing), `icon.svg` |
+| `frontend/src/app/` | `layout.tsx`, `page.tsx` (view switching, `?view=`/`?machine=` deep links, landing iframe), `globals.css` |
+| `frontend/src/components/` | Screens (`Dashboard`, `ReportIncident`, `IncidentAnalysis`, `MachineMemory`, `SliderDashboard`, `BeforeAfterMemory`, `Sidebar`), `ui.tsx` primitives, `analysis/*`, `intelligence/*`, `JudgeMode.tsx` (unused) |
+| `frontend/src/lib/` · `types/` | `api.ts` (typed client, cache), `utils.ts`; `incident.ts` (TS mirror of the API) |
 
 ---
 
 # 4. Frontend
 
-**Stack.** Next.js 14 (App Router, client components only), React 18, TypeScript, Tailwind CSS with a custom "industrial" palette, lucide-react icons. No UI component library, no state library, no router-based pages.
+**Stack.** Next.js 14 (App Router, client components), React 18, TypeScript, Tailwind, lucide-react and Three.js (landing page only). It uses no component library, no state library and no route-based pages.
 
-**Pages / layout.** There is a single route (`/`). `page.tsx` holds a `currentView` state (`dashboard | report | analysis | memory`), the current `AnalysisResult`, the selected machine ID, and whether the Before/After modal is open. Views are swapped in-place; `Sidebar` sits on the left. Components are re-mounted with React `key`s (incident ID, machine ID) so switching analysis or machine never shows stale data.
+**Navigation.**
 
-**State management.** Local `useState` + `useEffect` per component; each screen fetches its own data on mount. No caching layer (SWR/React Query), no global store. The analysis result is passed down from the report form via the page component.
+- `page.tsx` keeps `currentView` (`landing | dashboard | report | analysis | memory | intelligence | sliders`) and starts on `landing`, which is a full-screen iframe of `landing.html`.
+- The landing page navigates the app through links (`/?view=…&machine=…`) and `postMessage({action:"navigate", view})`.
+- `?view=`/`?machine=` are read on load and on `popstate`.
+- Each view is re-mounted with a `key`, then scrolls to the top and focuses its `h1`.
+- The **sidebar** lists Dashboard, Report Incident, Machine Memory and TRACE Intelligence, each with the question it answers. It polls `/health` every 30 s and shows Hindsight bank, SQLite count and LLM status lights, with the failure reason on hover.
 
-**API calls.** `lib/api.ts` wraps `fetch`: JSON headers, URL-encodes IDs, converts network failures into "Cannot reach the TRACE backend at …", flattens FastAPI 422 validation errors into `field: message` strings. Methods: `analyzeIncident`, `getIncident`, `recordOutcome`, `getMachineMemory`, `getDashboardStats`, `getFleet`, `getHeroMachines`, `healthCheck`.
+**Data.** Each screen fetches on mount. `lib/api.ts` handles errors ("Cannot reach the TRACE backend at …", flattened 422s, readable 503s) and caches GETs per session (Intelligence, fleet).
 
-**Screens**
-- **Sidebar** — navigation, machine search (trimmed + upper-cased), and a live status panel polling `/api/dashboard/health` every 30 s: Hindsight bank name (green/red), SQLite incident count, LLM model or "rule-based wording". Shows "Backend unreachable" in red when the API is down.
-- **Dashboard** — memory-health banner (stage by memory size), metric cards (total incidents, downtime logged, repairs that worked, resolution rate), outcome distribution, most frequent problems, fleet cards per machine type (count from stats; click opens the type's hero machine from `/fleet`), a "memory is working" card, a provenance line stating the history is synthetic, and a **See Memory Impact** button.
-- **Before/After Memory modal** — tabs for three hero machines; each side is computed live by the backend: "Without memory" (scorer given no evidence) vs "With memory" (real recall + scoring), plus the machine's own history for that problem and what trial and error cost it (failed/partial attempts and their downtime). A footer states that nothing is stored.
-- **Report Incident** — form driven by `/api/dashboard/fleet`: machine type → machine (production line auto-filled) → problem (catalog list or "Other / not listed" free text) → that problem's symptom chips + custom symptoms → description, suspected cause, operating hours, technician ID.
-- **Incident Analysis** — top: a dark "TRACE PIPELINE" panel (facts recalled, work orders recalled, kept as evidence, SQLite cross-reference, scoring result, confidence, whether LLM phrasing applied) and a "Memory Moment" banner (N related incidents, X worked / Y failed / Z partial, top similarity; or "No Relevant History Found"). Then a numbered flow mirroring judge questions:
-  1. *What happened* (incident details, readings)
-  2–4. *What TRACE remembered* (right column: evidence cards grouped Worked / Failed / Partially worked / Not verified; each expandable with description, action, outcome, confirmed cause, quoted technician notes, downtime, and the **raw text recalled from Hindsight** in monospace)
-  5. *What TRACE recommends* (intervention category, most recent successful instance, confidence badge)
-  6–7. *Why this confidence (computed)* — the deterministic basis sentence, an **evidence tally table** (worked/partial/failed/unverified/on this machine per intervention, IDs on hover), cautions
-  - A visually separate **AI-written summary** box (dashed purple border, italic, labelled "Wording only… cannot change the action or confidence")
-  8. *Where the evidence came from* — bank, tag filters, counts, relevance rule, SQLite cross-reference
-  - *Record outcome* form (intervention type from catalog datalist or free text, action, outcome buttons, root cause, repair time, downtime, notes).
-- **Machine Memory** — health summary (model, line, incidents, defect types, % attempts that worked, downtime), stat cards, recurring defects, what has / hasn't worked (with counts), intervention chart, and the full maintenance timeline (newest first; date, work order, technician, hours, downtime, category + action, outcome, notes).
+**Screens.**
 
-**Important UI decisions.**
-- Historical facts vs AI text are visually distinct; the LLM sentence is never rendered as fact.
-- The UI never shows a recommendation when the backend returns none ("No evidence-backed recommendation").
-- All forms are built from the backend catalog so the UI cannot offer machine types that have no data.
-- The dataset is labelled synthetic on the dashboard.
+- **Landing:** a 3D planet scene titled "Troubleshoot Smarter, Not Harder", with entry links to the dashboard, report form, showcase machines, sliders and API docs.
+- **Dashboard:**
+  - Stat tiles: work orders, machines, share of repairs that worked (SUCCESS ÷ recorded outcomes, the same basis as the bars), downtime.
+  - Outcome bars and the most frequent problems.
+  - Fleet cards per equipment type, which open that type's showcase machine.
+  - A subtitle giving the provenance (synthetic data) and the memory bank.
+- **Report Incident:**
+  - Catalog-driven form (type → machine → problem or free text → symptom chips → description, suspected cause, hours, technician).
+  - A *Load a demo incident* picker (backend presets).
+  - While the request runs, `AnalysisProgress` names each stage.
+- **Incident Analysis:**
+  - `DecisionSummary`: the action, or *recommendation intentionally withheld* with what was searched. Its `ConfidenceMeter` shows "N of M recorded attempts worked".
+  - `DecisionPipeline`: interactive recall → gate → score → phrase, with the tag filters and counts.
+  - `WhyPanel`: the confidence checklist, a verdict for each alternative, and the AI summary in a separate labelled box.
+  - `EvidenceList`: evidence grouped Worked / Failed / Partial / Not verified, with recency labels and the raw recalled Hindsight text.
+  - `OutcomeForm`: records the outcome and shows *memory grew*.
+- **Machine Memory:** a picker, then stats, recurring problems, what has and hasn't worked, and a full timeline with problem filters and repair-chain markers (*follow-up*, *came back after a fix*).
+- **TRACE Intelligence:** see §9.
+- **Before/After Memory modal** (opened from Intelligence): three showcase machines, each with the live *without* vs *with* memory recommendation, the machine's history and the trial-and-error cost. Nothing is stored.
+- **Adaptive Intelligence & ROI** (`?view=sliders`, from the landing page):
+  1. A split slider over live `/hero-machines` data.
+  2. An **ROI simulator** driven by adjustable assumptions (fleet 39, $1,850/h downtime, 14.5 incidents/yr, 47 % baseline fix rate, 85 % adoption, 45 min saved).
+  3. A **learning scrubber** that auto-plays 16 months. Its cards come from formulas of the month position (e.g. `38 + √(month/16)·44` %), so it is an **illustration, not data**. The measured timeline is Intelligence → Knowledge evolution.
+
+**UI principles.**
+
+- Facts and AI text are visually distinct.
+- There is never a recommendation without evidence.
+- Forms come from the backend catalog.
+- The data is labelled synthetic.
+- Shared primitives in `ui.tsx` (PageHeader, StatTile, Loading/Empty/ErrorState, ConfidenceMeter, CARD/BUTTON classes) keep screens consistent.
+- Motion respects `prefers-reduced-motion`.
+- Accessibility: skip link, one `h1` per view, `aria-current`, labelled controls and text alternatives for charts.
+
+**Redesign note.** PR #10 replaced the light "industrial" theme with a dark navy glass theme, added the landing page and ROI view, and removed **Judge mode** (the presenter bar) from the page and sidebar. `JudgeMode.tsx` is still in the repo, and `ReportIncident` still reads its `usePresentation()` context, which defaults to false.
 
 ---
 
 # 5. Backend
 
-**FastAPI structure.** `main.py` creates the app, adds CORS (origins from `CORS_ORIGINS`), registers two routers under `/api`, creates tables on startup (`on_event("startup")`), and installs two exception handlers: `MemoryUnavailableError` → 503 JSON, any other exception → 500 JSON with `detail`.
+**App.** `main.py` sets up CORS (`CORS_ORIGINS`), the `/api` routers, table creation on startup (`on_event`), and two handlers: `MemoryUnavailableError` → 503 with a readable reason, and anything else → 500 JSON.
 
 **Routers.**
-- `api/incidents.py` — analyze, get by ID (404 if missing), record outcome (404 if missing), machine memory.
-- `api/dashboard.py` — stats, fleet catalog, hero-machine memory impact, health (30 s in-process cache, 8 s Hindsight timeout).
+
+- **incidents:** analyze, get (404), outcome (404/422/503), machine memory.
+- **dashboard:** stats (including monthly memory growth), fleet (catalog, `hero_machine_id`, `demo_presets`, `demo_outcome`), hero-machines (dry run), health (30 s cache, 8 s Hindsight timeout, last real memory error).
+- **intelligence:** the full report (cached by data fingerprint) and `problem` (engine over all outcomes for one type/problem, optionally machine-weighted).
 
 **Services.**
-- `AnalysisService` — per-request object composing `MemoryService`, `RecommendationEngine`, `ReasoningPhraser`. Methods: `analyze_incident`, `get_machine_memory`, `memory_impact` (dry run for hero machines). Module-level `select_evidence` is the relevance gate.
-- `MemoryService` — narrative building, tags, metadata, retain (single/batch), two-pass recall + SQLite mapping, outcome update with replace, deletes (for resets), machine history, statistics.
-- `RecommendationEngine` — pure deterministic scoring.
-- `ReasoningPhraser` — Groq call and output validation.
 
-**Models (pydantic).** `IncidentCreate` (report), `Incident` (full record incl. outcome fields, intervention category, downtime, severity, technician, operating hours), `IncidentUpdate` (outcome), `HistoricalIncident` (incident + similarity + relevance factors + recalled facts), `EvidenceSummary` (per-intervention tallies), `Recommendation` (action, category, confidence, basis, evidence, warnings, reasoning, reasoning source, supporting IDs), `AnalysisResult` (everything the analysis screen needs, including `memory_trace`), `ActionOutcome` enum (SUCCESS, PARTIAL, FAILED, UNKNOWN).
+- **`AnalysisService`:** analyze, machine memory, memory-impact dry run, and the insights (recency band, pattern alert, cross-machine evidence).
+- **`MemoryService`:** narratives, tags, retain (single/batch), two-pass recall mapped to SQLite, replace-on-outcome, deletes for resets, stats.
+- **`RecommendationEngine`:** pure scoring plus `confidence_checks` and verdicts.
+- **`ReasoningPhraser`:** the LLM call and its guards.
+- **`IntelligenceService`:** chronological replay and analytics.
 
-**Dependency injection.** None in the FastAPI `Depends` sense: each route instantiates `AnalysisService`/`MemoryService` and closes it in `finally`. Configuration is a module-level `settings` singleton. Tests swap `HindsightClient` via monkeypatching the module attribute.
-
-**Utilities / data.** `catalog.py` is effectively domain configuration (fleet, defects → causes → interventions, sensor normal ranges, technicians, hero machines) and powers both the generator and `/fleet`. `generator.py` produces the synthetic history deterministically.
-
-**Business logic location.** Decision logic lives only in `recommendation.py` and `select_evidence`; everything else is plumbing. This separation is deliberate so the decision can be tested without any external service.
+**Design.** Decision logic lives only in `recommendation.py` and `select_evidence`, and Intelligence reuses the engine unchanged. There is no FastAPI `Depends` injection: routes construct services and close them in a `finally` block, and tests monkeypatch `HindsightClient`.
 
 ---
 
 # 6. Database
 
-**Engine.** SQLite via SQLAlchemy 2 async (`aiosqlite`); file `backend/trace.db` (git-ignored). Tables created at startup; `seed_data.py` drops and recreates them.
+SQLite through async SQLAlchemy 2 (`aiosqlite`), in the file `backend/trace.db` (git-ignored). It has one table, **`incidents`**, and no relationships; machines, technicians and the fleet model live in `catalog.py`.
 
-**Table `incidents`** (single table, no relationships).
+| Column(s) | Notes |
+|---|---|
+| `incident_id` (PK) | `WO-YYYY-NNNNN` generated; `INC-YYYYMMDD-XXXXXX` live |
+| `machine_id`, `machine_type`, `production_line`, `defect_type`, `intervention_category`, `action_outcome` | Indexed strings; outcome SUCCESS/PARTIAL/FAILED/UNKNOWN/NULL (open) |
+| `timestamp`, `created_at` | Naive UTC |
+| `symptoms`, `sensor_values`, `operating_conditions` | JSON |
+| `description`, `suspected_root_cause`, `confirmed_root_cause`, `action_taken`, `resolution_details`, `technician_notes` | Text |
+| `resolution_time_minutes`, `downtime_minutes`, `operating_hours` | Integers; downtime ≥ repair; hours monotonic per machine |
+| `severity`, `technician_id` | Generated history only / e.g. T-117 |
 
-| Column | Type | Notes |
-|---|---|---|
-| `incident_id` | String(100), **PK** | `WO-YYYY-NNNNN` for generated history, `INC-YYYYMMDD-XXXXXX` for live reports |
-| `machine_id` | String(100), indexed | e.g. CNC-204 |
-| `machine_type` | String(100), indexed | e.g. CNC_Machining_Center |
-| `production_line` | String(100), indexed | |
-| `timestamp` | DateTime, indexed | naive UTC |
-| `defect_type` | String(150), indexed | e.g. spindle_vibration |
-| `symptoms` | JSON | list of strings |
-| `sensor_values` | JSON | dict, keys like `spindle_vibration_mm_s` |
-| `operating_conditions` | JSON | shift, product, utilisation or plant demand |
-| `description` | Text | operator-style report |
-| `suspected_root_cause`, `confirmed_root_cause` | Text | confirmed only when a fix truly addressed the cause |
-| `action_taken` | Text | concrete action text |
-| `intervention_category` | String(150), indexed | normalised intervention type used for grouping |
-| `action_outcome` | String(20), indexed | SUCCESS / PARTIAL / FAILED / UNKNOWN / NULL (open) |
-| `resolution_details`, `technician_notes` | Text | |
-| `resolution_time_minutes`, `downtime_minutes` | Integer | downtime ≥ repair time |
-| `severity` | String(20) | LOW/MEDIUM/HIGH/CRITICAL (generated history only) |
-| `technician_id` | String(20) | e.g. T-117 |
-| `operating_hours` | Integer | hour meter; monotonic per machine |
-| `created_at` | DateTime | |
+**Example chain.**
 
-**Relationships.** None — machines, technicians and the fleet model live in `catalog.py`, not in tables.
+1. `WO-2025-04551`: CNC-204 spindle vibration of 7.5 mm/s. Laser alignment → **FAILED** ("suspect bearing degradation rather than alignment").
+2. Three days later, `WO-2025-04558`: bearing replacement → **SUCCESS**.
 
-**Sample records (abridged).**
-- `WO-2025-04551` — CNC-204, CNC machining center, Machining Cell 2, 2025-11-04 21:40, spindle_vibration; readings: vibration 7.5 mm/s at 10,500 rpm, spindle temp 53.6 °C; suspected "tool holder imbalance / runout"; action "Laser alignment of spindle head, shimmed and re-torqued" (category *Spindle alignment / tramming*); **FAILED**; notes "Tram and ballbar within spec after adjustment; vibration back … suspect bearing degradation rather than alignment." Three days later `WO-2025-04558` records bearing replacement **SUCCESS** with confirmed cause *spindle bearing degradation*.
-- HP-303 pressure-loss chain: relief valve adjustment PARTIAL → pump replacement FAILED → cylinder reseal SUCCESS (Sep 2025); Apr 2026 same symptom: cylinder reseal FAILED → relief valve replacement SUCCESS (different cause).
-
-**Current contents.** 567 generated work orders (plus whatever live incidents are created by demos; resets remove the demo machine's).
+**Contents.** 567 generated work orders, plus any live demo incidents. The deployed instance showed 569 at the time of writing.
 
 ---
 
 # 7. Hindsight Integration
 
-Hindsight is the central memory layer. All interaction goes through `backend/app/hindsight/client.py` (SDK wrapper) and `memory.py` (logic).
+All calls go through `hindsight/client.py` (SDK wrapper) and `hindsight/memory.py`.
 
-**Bank / namespace.** One bank per deployment, `HINDSIGHT_NAMESPACE` (default `trace-maintenance`), created by `seed_data.py` with a mission text describing a maintenance memory for the five equipment types. Machine-type isolation is implemented with **tags**, not separate banks (the original plan proposed one bank per machine type; tags achieve the same isolation in one bank and allow cross-type administration).
+**Bank.** There is one bank per deployment, set by `HINDSIGHT_NAMESPACE`: `trace-manufacturing` on Render and `trace-maintenance` by default locally. `seed_data.py` creates it with a mission text. Equipment types are isolated with **tags** rather than separate banks.
 
-**Where retain happens.**
-1. `seed_data.py` → `MemoryService.retain_many` → `retain_batch` (25 items per batch, 4 concurrent batches, retries). ~567 documents in about a minute.
-2. `POST /incidents/analyze` → `store_incident` → `retain` (new incident, outcome "not yet recorded").
-3. `PATCH /incidents/{id}/outcome` → `update_incident_outcome` → `retain(..., update_mode="replace")`.
+**Retain.**
 
-**What is retained (the "embedding content").** A narrative written like a technician's work-order summary (`build_narrative`), containing only facts from the record: work-order ID and date (+ shift); machine ID, model and line, operating hours; problem; operator description; symptoms; **only abnormal sensor readings with their normal range** (plus one key operating reading); product; the technician's suspected cause; intervention category and action; outcome (or "not yet recorded"); confirmed cause; technician notes; downtime and severity. Hindsight performs its own fact extraction and embedding server-side; TRACE does not compute embeddings.
+1. **Seeding:** `retain_batch` in batches of 25, 4 concurrent, with retries. About 567 documents take roughly a minute.
+2. **Analyze:** the new incident is retained with its outcome "not yet recorded".
+3. **Outcome:** re-retained with `update_mode="replace"`.
 
-**Metadata and tags per document.**
-- `document_id` = SQLite `incident_id` (the cross-reference key).
-- `timestamp` = incident time (gives Hindsight temporal context).
-- `metadata` (strings): incident_id, machine_id, machine_type, defect_type, outcome (or NONE), intervention_category.
-- `tags`: `machine_type:<slug>`, `machine:<slug>`, `defect:<slug>`.
+**Content.** A technician-style narrative (`build_narrative`) containing:
 
-**Where recall happens.** `MemoryService.search_similar_incidents`, called by `analyze_incident` and `memory_impact`. The query is natural language: "<machine label> <machine id>: <problem>. <description> Symptoms: … Suspected: … What was done before and did it work?"
+- the ID, date and shift
+- the machine, model, line and hours
+- the problem, description and symptoms
+- **abnormal readings only, each with its normal range**
+- the product and the suspected cause
+- the intervention and action
+- the outcome, confirmed cause and notes
+- downtime and severity
 
-**Search strategy and filters.** Two recalls run concurrently:
-1. **Fleet pass** — `tags=[machine_type:<type>]`, `tags_match="all_strict"`, `max_tokens=6000`.
-2. **Same-machine pass** — `tags=[machine_type:<type>, machine:<id>]`, `all_strict`, `max_tokens=3000` — guarantees a machine's own history is never crowded out by look-alikes elsewhere in the fleet (this fixed a real bug found in validation).
+Hindsight extracts the facts and embeds them server-side.
 
-Both request only `types=["world","experience"]` facts, because those carry `document_id`; Hindsight's consolidated `observation` facts have no document link and are excluded.
+**Metadata.** `document_id` = `incident_id`, and `timestamp` = incident time. Metadata holds the IDs, type, defect, outcome and category. Tags are `machine_type:*`, `machine:*` and `defect:*`.
 
-**Retrieved evidence.** Facts are grouped by `document_id`; each document's best fact `scores.semantic` becomes its similarity (0–1); the corresponding rows are loaded from SQLite in one query; rows without an outcome and (defensively) of another machine type are dropped; the top two fact texts are attached as `recalled_facts` and shown in the UI. A `memory_trace` records bank, tag filters, query, facts recalled (fleet vs same-machine), documents recalled, documents with outcome.
+**Recall** (`search_similar_incidents`). A natural-language query ("… What was done before and did it work?") runs twice in parallel with `tags_match="all_strict"`:
 
-**Observed behaviour on the real bank.** Same-problem work orders score ~0.85–0.93; unrelated ones ~0.72–0.79. A novel problem still recalls ~60–75 work orders, which the relevance gate then rejects.
+- **Fleet:** `[machine_type]`, `max_tokens=6000`
+- **Same machine:** `[machine_type, machine]`, `max_tokens=3000`. This pass fixed a real bug: a machine's own history was being crowded out.
 
-**Why Hindsight instead of SQLite search.**
-- Reports are free text written by different people ("chatter marks", "waviness", "spindle noise at high speed"); semantic recall matches meaning, SQL `LIKE` does not.
-- Hindsight ranks within a fleet of ~100+ same-type records, surfacing the most similar contexts (same readings, same product, same suspicion) rather than every record with a matching code.
-- Temporal and entity-aware memory (timestamps, extracted facts) comes with the service.
-- SQLite remains the authority for numbers and outcomes; Hindsight is used for *which past incidents are relevant*, not for *what happened in them*.
+Only `world`/`experience` facts are requested, because they carry `document_id`; observations are excluded. Facts are grouped per document, and the best `semantic` score becomes the similarity. Rows are loaded from SQLite, and the top two fact texts are shown as `recalled_facts`. A `memory_trace` records the bank, filters, query and counts.
 
-**Honest caveat for reviewers.** The relevance gate keeps same-`defect_type` matches regardless of similarity, so for catalogued problems the evidence set is "Hindsight's recalled candidates, filtered by a structured field". Hindsight's role is candidate retrieval, ranking, same-machine recall, related-problem discovery (shared symptom + ≥0.80 similarity) and the displayed memory text; it does not alone decide relevance. Hindsight features such as `reflect()`, mental models, directives and observations are not used.
+**Observed scores.** Same-problem work orders score about 0.85–0.93 and unrelated ones about 0.72–0.79. A novel problem still recalls 60–75 work orders, and the gate rejects all of them.
 
-**Other Hindsight calls.** `aget_bank_config` (health check), `delete_document` via the SDK's internal `_documents_api` (demo/validation resets), `adelete_bank`/`acreate_bank` (seeding).
+**Why Hindsight.**
+
+- It matches free text by meaning ("chatter marks" vs "waviness").
+- It ranks the most similar contexts among 100+ same-type work orders.
+- Temporal and entity awareness come built in.
+- SQLite stays the authority for *what happened*.
+
+**Errors.** `describe_memory_error` turns SDK exceptions (e.g. exhausted credits, auth, timeouts) into readable messages. These appear in 503 responses and in `/health` (`last_error`).
+
+**Caveat.** For catalogued problems the gate keeps same-`defect_type` matches regardless of similarity. Hindsight retrieves, ranks, recalls same-machine history and discovers related problems, but it does not decide relevance on its own. `reflect()`, mental models, directives and observations are not used. Deletion relies on the SDK's private `_documents_api`.
 
 ---
 
 # 8. Recommendation Engine
 
-File: `backend/app/services/recommendation.py`. Pure Python; no network, no LLM.
+`services/recommendation.py` is pure Python with no network and no LLM.
 
-**Step 0 — Relevance gate** (`services/analysis.py::select_evidence`). From recalled incidents with outcomes, keep an incident if:
-- same `defect_type` as the report, **or**
-- it shares at least one symptom (case-insensitive) **and** similarity ≥ 0.80 (labelled "Related defect (high similarity)").
+**Gate** (`analysis.py::select_evidence`). An incident is kept if it has the same `defect_type`, **or** it shares a symptom and has similarity ≥ 0.80. This machine's incidents come first, then the rest ordered by similarity × recency, with a cap of **15**.
 
-Then sort **this machine's incidents first**, then by similarity, and cap at **15**.
+**Tally.** Incidents are grouped by `intervention_category` (falling back to the action text). For each group the engine counts SUCCESS, PARTIAL, FAILED and UNKNOWN with their IDs, plus same-machine successes and failures. The most recent successful action becomes the `example_action`.
 
-**Step 1 — Tally per intervention category.** Evidence is processed newest first. Category = `intervention_category` (fallback: action text). For each category count SUCCESS, PARTIAL, FAILED, UNKNOWN; record incident IDs per outcome; count same-machine successes and failures; the most recent successful action text becomes the `example_action`.
+**Score.** `successes + 0.5·partials − failures ± 0.5` per same-machine success/failure. UNKNOWN outcomes score 0 and are not attempts. Groups are sorted by `(score, successes, −failures)`, and the winner is the first with ≥ 1 success and a score above 0.
 
-**Step 2 — Score.**
-`score = successes + 0.5·partials − failures + 0.5·same_machine_successes − 0.5·same_machine_failures`
-UNKNOWN outcomes score 0 and are not counted as attempts.
+**Confidence** (attempts = successes + partials + failures):
 
-**Step 3 — Pick the winner.** Categories are sorted by `(score, successes, −failures)` descending; ties beyond that keep newest-first insertion order (the category whose most recent incident is newest wins). The winner is the first category with **≥1 success and score > 0**.
+| Level | Rule |
+|---|---|
+| HIGH | ≥ 3 successes and ≥ 75 %; or ≥ 2 same-machine successes, none failed there, ≥ 3 overall and ≥ 60 % |
+| MEDIUM | ≥ 2 successes and ≥ 50 % |
+| LOW | Any other positive evidence |
+| INSUFFICIENT_DATA | No evidence, or nothing ever succeeded → `"No evidence-backed recommendation"`, no category |
+| Downgrade | One level down if the winner failed on this machine and never worked there (with a warning) |
 
-**Step 4 — Confidence** (attempts = successes + partials + failures):
-- **HIGH** — ≥3 successes and success rate ≥ 75%, **or** ≥2 successes on this same machine with no failure there, ≥3 successes overall and rate ≥ 60%.
-- **MEDIUM** — ≥2 successes and rate ≥ 50%.
-- **LOW** — any other positive evidence (e.g. a single success).
-- **Downgrade** — if the winner has failed on this machine and never succeeded here: HIGH→MEDIUM, MEDIUM→LOW, plus a warning.
+**Explainability outputs.**
 
-**Step 5 — No-recommendation cases (INSUFFICIENT_DATA).**
-- No evidence at all → `suggested_action = "No evidence-backed recommendation"`, category `None`, basis "Memory holds no earlier <problem> incident with a recorded outcome for this machine type", one warning. (The earlier codebase returned hardcoded "default actions" here; that was removed.)
-- Evidence exists but nothing ever succeeded → no action; warnings list what failed/partially worked with IDs; reasoning advises escalation for root-cause diagnosis.
+- `confidence_checks[]`: each rule with *met / not met* and its numbers.
+- Per intervention: `attempts`, `success_rate`, `verdict` (`selected` or `rejected`) and a `verdict_reason` ("Never worked: failed 2 of 2 attempt(s)", "Lower score (1 vs 2)").
+- `basis`: a sentence such as "7 of 7 recorded attempts with Relief valve replacement on similar incidents succeeded (1 on HP-303)".
+- Warnings about the winner's own failures, other failed fixes, and no history on this machine.
 
-**How failures affect results.** They subtract a full point, count as attempts (lowering success rate), can downgrade confidence if on the same machine, and generate warnings: the winner's own failures ("…also failed N time(s) … the cause may differ this time"), and every other category that has failed (up to ~4 warnings). A warning is also added when there is no history of the problem on this machine.
+**Insights.**
 
-**How partial successes affect results.** +0.5 to the score, counted as attempts (so they reduce the success rate but less harmfully than failures), listed separately in the tally table and evidence cards.
+- A recency label for each item (recent < 2 mo, older < 8 mo, historical).
+- `pattern_alert`: how often the problem recurs in the evidence.
+- `cross_machine_evidence`: fixes that worked on ≥ 2 other machines.
 
-**Output.** `Recommendation` with `suggested_action` (= winning category), `intervention_category`, `confidence`, `basis` (one computed sentence, e.g. "7 of 7 recorded attempt(s) with Relief valve replacement on similar incidents succeeded (1 on HP-303); 0 failed, 0 partial."), `evidence` (all tallies), `warnings`, `supporting_incidents` (winner's SUCCESS IDs), deterministic `reasoning`, `reasoning_source="deterministic"`.
+**Not handled.**
 
-**Edge cases handled/tested.** Empty evidence; only failures; partial/unknown mixes; ties; same-machine failure downgrade; winner by score not by attempt count; evidence from other machines only; new free-text categories (group only on identical text).
-
-**Edge cases not handled.** No recency weighting (a 14-month-old success weighs the same as last week's); similarity does not weight the score; sensor readings and suspected cause are not used by the scorer (so "same symptom, different cause" histories, such as HP-303, are resolved by outcome counts, not by matching readings); no statistical confidence interval.
-
----
-
-# 9. Groq Integration
-
-File: `backend/app/services/phrasing.py`. Client: OpenAI Python SDK pointed at `https://api.groq.com/openai/v1`, model `openai/gpt-oss-120b` (configurable `LLM_MODEL`), temperature 0.2, `max_completion_tokens` 1024, 20 s timeout, 1 retry. If `GROQ_API_KEY` is empty the step is skipped.
-
-**System prompt (paraphrased).** "You write the reasoning paragraph for a manufacturing troubleshooting recommendation. Use ONLY the facts given below. Do not add, infer, or assume anything not listed: no new causes, actions, numbers, incident IDs, or safety advice. Do not change the recommended action or the confidence level. Cite supporting incidents by their exact IDs and state clearly what worked and what failed. If there is no evidence-backed recommendation, say so plainly and do not suggest any action. 2–4 plain sentences, no markdown."
-
-**What is sent (user message, structured text).**
-- Current incident: machine ID and type, problem, symptoms.
-- Decision block (marked "computed by deterministic scoring; do not change it"): recommended intervention, confidence in words ("insufficient evidence (no recommendation)" instead of the enum), basis sentence.
-- Evidence per intervention: counts of success/partial/failed/unverified and the incident IDs per outcome.
-- This machine's own history (up to 4 newest evidence items: ID, date, category, outcome).
-- Warnings.
-- The deterministic reasoning as "reference wording — rephrase it, do not extend it".
-
-**What is NOT sent.** Raw descriptions, technician notes, sensor readings, operating conditions, confirmed causes of other incidents (except via the reference wording), SQLite rows, Hindsight fact text, technician IDs, any secrets.
-
-**Hallucination prevention and validation.**
-1. The LLM never decides: action and confidence are fixed before the call; the result is applied with `model_copy(update={"reasoning": …})` so only the text changes.
-2. Output cleaned: `<think>…</think>` blocks stripped (for reasoning models like qwen3), whitespace normalised.
-3. Rejected and replaced by the deterministic text when: the API errors or times out; the reply is empty; **any incident ID matching `WO-/INC-/TRC-…` is not in the evidence set or the current incident**; or, for an INSUFFICIENT_DATA result, the reply does not acknowledge missing evidence (must contain "no", "not", "none" or "insufficient").
-4. `reasoning_source` ("llm" / "deterministic") is returned and shown in the UI and pipeline panel.
-5. Tests cover every fallback path, and a test asserts the model cannot alter action or confidence.
-
-**Residual risk.** The validator cannot detect invented numbers, causes or softer embellishments (e.g. "may involve a different cause") that don't contain IDs; it relies on the prompt for those. The UI mitigates by labelling the text "AI-written… wording only".
+- Recency and similarity don't weight the score (recency only affects ordering).
+- Sensor readings and the suspected cause are unused.
+- There is no statistical interval in the live engine (Intelligence uses Wilson for ranking).
 
 ---
 
-# 10. Complete User Journey
+# 9. TRACE Intelligence
 
-1. **Technician reports an incident** (Report Incident). The form loads `/api/dashboard/fleet`; they choose type → machine (line auto-fills) → problem → symptoms, and type a description (+ optional suspected cause, hours, technician ID). Submitting calls `POST /api/incidents/analyze`.
-2. **Memory is queried.** Backend builds a natural-language query and runs the fleet and same-machine recalls in parallel against the tag-filtered Hindsight bank; facts are grouped per document and mapped to SQLite rows; open incidents are dropped; the relevance gate selects up to 15 evidence incidents (this machine first). The new incident is then stored in SQLite and retained in Hindsight (rollback if Hindsight fails → 503).
-3. **Recommendation generated.** Deterministic tally, score, winner, confidence, basis, warnings — or "No evidence-backed recommendation".
-4. **Explanation generated.** Groq rewrites the computed result; validation accepts or falls back.
-5. **Technician sees the analysis** (~5–8 s end-to-end with real services): pipeline panel, memory moment, evidence grouped by outcome with recalled memory text, recommendation + computed basis + tally table, AI summary box, provenance. They perform the repair on the floor.
-6. **Technician submits the outcome** (Record outcome form): intervention type (catalog suggestion or free text), action, SUCCESS/PARTIAL/FAILED/UNKNOWN, root cause, repair time, downtime, notes → `PATCH /api/incidents/{id}/outcome`.
-7. **Memory updated.** SQLite row updated (category defaults to the action text if blank; downtime defaults to repair time); the Hindsight document is re-retained with the outcome using `replace`. The next similar incident — on this machine via the same-machine recall pass, or elsewhere in the fleet via the fleet pass — will retrieve it as evidence, and the scorer will count it.
+`services/intelligence.py` → `GET /api/intelligence`. It is read-only and uses SQLite and the unchanged engine; there is no LLM. The report takes about 100 ms to compute and is cached by a data fingerprint (count + latest update).
 
----
+It rests on two computations:
 
-# 11. APIs
+- **Knowledge per problem:** the engine over every recorded outcome for each (type, problem).
+- **Chronological replay:** for each work order, what memory held *before* it, and whether the action taken matched what the engine would have recommended then. Real recalls aren't logged, and the page says so.
 
-All paths are prefixed with `/api`. Errors are JSON `{"detail": …}`: 404 unknown incident, 422 validation (list of field errors), 503 Hindsight unavailable (nothing saved), 500 other.
-
-| Method | Path | Purpose | Request | Response (key fields) |
-|---|---|---|---|---|
-| POST | `/incidents/analyze` | Full pipeline; stores the incident | `IncidentCreate`: machine_id, machine_type, production_line, defect_type, description (all non-empty), symptoms[], sensor_values{}, operating_conditions{}, suspected_root_cause?, operating_hours?, severity?, technician_id? | `AnalysisResult`: current_incident; historical_incidents[] (incident, similarity_score, relevance_factors, recalled_facts); successful/failed/partial_interventions[] (incident_id, action, category, outcome, root_cause, machine_id, same_machine, date, similarity, relevance); recommendation (suggested_action, intervention_category, confidence, basis, evidence[] tallies, warnings, reasoning, reasoning_source, supporting_incidents); memory_contribution; memory_trace |
-| GET | `/incidents/{incident_id}` | Fetch one record | — | `Incident` or 404 |
-| PATCH | `/incidents/{incident_id}/outcome` | Record outcome; replaces memory | `IncidentUpdate`: action_taken (non-empty), action_outcome (enum), intervention_category?, confirmed_root_cause?, resolution_details?, resolution_time_minutes?, downtime_minutes?, technician_notes? | Updated `Incident`, 404, 422 or 503 |
-| GET | `/incidents/machine/{machine_id}/memory` | Machine summary from SQLite | — | machine_id, machine_type, model, production_line, total_incidents, total_downtime_hours, outcome_distribution, recurring_defects [[defect,count]], successful_interventions {category: [defects]}, failed_interventions, recent_incidents (5), timeline[] (all incidents, newest first, with action, outcome, technician, notes, downtime, severity, hours). Unknown machine → total 0, empty lists |
-| GET | `/dashboard/stats` | Fleet statistics from SQLite | — | total_incidents, incidents_with_outcome, unique_machines, outcome_distribution, defect_type_distribution, machine_type_distribution, total_downtime_hours, history_start, history_end, memory_bank |
-| GET | `/dashboard/fleet` | Catalog for forms | — | machine_types[]: machine_type, label, machines[] (id, line, model), defect_types[] (defect_type, symptoms[]), intervention_categories[], hero_machine_id |
-| GET | `/dashboard/hero-machines` | Live before/after comparison (dry run, no LLM, nothing stored) | — | hero_machines[]: key, title, story, incident, without_memory (Recommendation), with_memory (Recommendation), evidence_incidents[], memory_trace, trial_and_error {attempts_that_did_not_work, downtime_minutes, incident_ids}, machine_history[] |
-| GET | `/dashboard/health` | Dependency check, cached 30 s | — | status healthy/degraded, checks {sqlite {ok, incidents}, hindsight {ok, bank, error?}, llm {ok, model}} |
-| GET | `/` (no prefix) | API info | — | name, version, docs link |
-
-OpenAPI docs at `/docs`. The dashboard endpoints use `Dict[str, Any]` response models (no typed schema in OpenAPI); the frontend↔backend contract is enforced by a test instead.
+| Section | Content (current data) |
+|---|---|
+| Overview | Coverage: 24 of 25 known problems have a proven fix; confidence mix; knowledge age |
+| Memory impact | Followed memory: **58 %** worked (185 attempts, median 3.1 h downtime) vs a different action: **48 %** (269, 3.8 h); no memory yet: 73 % (n = 26, flagged small/first-occurrence) |
+| Knowledge evolution | Monthly: problems answerable 11 → 24, HIGH-confidence problems 0 → 8, share of new work orders with prior memory 57 % → 100 % |
+| Knowledge changes | Latest confidence changes, upgrades and downgrades |
+| Memory reuse | Same-machine vs fleet-only prior evidence; most-recommended repairs; most-cited work orders |
+| Recommendation trust | `GET /intelligence/problem` for any problem: same meter, checklist and verdicts as the analysis page |
+| Reliable repairs | 95 % Wilson lower bound, ≥ 5 attempts; least reliable too |
+| Failure patterns | Top problems with trend; recurring per machine; per type |
+| Machine ranking | By problems with a fix proven on that machine; expandable |
+| Knowledge network | Machines → problems → repairs → outcomes (lazy, with text alternative) |
 
 ---
 
-# 12. Demo Flow
+# 10. Groq Integration
 
-**Starting state.** Seeded bank and SQLite (567 work orders); `python -m scripts.demo --reset` run so AC-407 (a compressor "commissioned 2026-08") has no history; nobody in the fleet has ever had a *condensate drain failure* (by design).
+`services/phrasing.py` uses the OpenAI SDK against `https://api.groq.com/openai/v1`, with model `openai/gpt-oss-120b`, temperature 0.2, 1024 tokens, a 20 s timeout and 1 retry. It is skipped if there is no key.
 
-**Scene 1 — Dashboard** (`GET /stats`, `/fleet`, `/health`). Show 567 incidents, 39 machines, 5 types, ~4,030 h downtime logged, outcome mix (47% success, 20% partial, 23% failed, 10% not verified), sidebar status green for Hindsight/SQLite/LLM, provenance line "synthetic, operationally realistic".
+**Prompt.** "Use ONLY the facts given; don't add causes, actions, numbers, IDs or safety advice; don't change the action or confidence; cite exact IDs; if there is no recommendation, say so; 2–4 sentences."
 
-**Scene 2 — See Memory Impact** (`GET /hero-machines`, ~2 s). Tabs:
-- CNC-204 spindle vibration: without memory → insufficient evidence; with memory → *Spindle bearing replacement*, LOW ("3 of 7 … succeeded (2 on CNC-204); 2 failed, 2 partial"); machine history alignment FAILED → bearings SUCCESS → re-lube PARTIAL → bearings SUCCESS; trial-and-error cost 2 attempts, ~9 h.
-- HP-303 pressure loss: with memory → *Relief valve replacement*, HIGH (7 of 7); cost 3 attempts, ~75 h.
-- CV-507 belt mistracking: → *Idler replacement*, HIGH (4 of 5); cost 1 attempt, ~3 h.
+**What is sent.**
 
-**Scene 3 — New problem, no history** (`GET /fleet`, `POST /analyze`). Report AC-407, condensate drain failure, symptoms "water in compressed air line", "auto drain not cycling". Expected: "No Relevant History Found — Hindsight recalled ~67 compressor work orders, none about this problem"; recommendation "No evidence-backed recommendation"; AI summary says the same.
+- The incident (machine, type, problem, symptoms).
+- The fixed decision block.
+- Per-intervention tallies with IDs.
+- This machine's last 4 evidence outcomes.
+- The warnings.
+- The deterministic text, marked "rephrase, don't extend".
 
-**Scene 4 — Record outcome** (`PATCH /outcome`). Condensate drain replacement, SUCCESS, root cause, 55 min repair, 90 min downtime → "Saved to SQLite and Hindsight".
+**What is not sent:** notes, readings, raw descriptions, Hindsight text, technician IDs or secrets.
 
-**Scene 5 — The memory loop** (`POST /analyze`). Similar AC-407 report. Expected: "TRACE Found 1 Related Historical Incident (1 on AC-407)", evidence card tagged *this machine* (~81–86% match) with action/cause/notes/recalled text; recommendation *Condensate drain replacement*, **LOW** ("1 of 1 … (1 on AC-407)"); AI summary cites the Scene 3 incident ID.
+**Guards.**
 
-**Scene 6 — Machine Memory** (`GET /machine/CNC-204/memory`). 15 incidents, recurring defects, what worked/failed, the spindle chain in the timeline with technician notes.
+- Only `reasoning` is replaced (`model_copy`), so the decision cannot change.
+- `<think>` blocks are stripped.
+- The reply is rejected if the call errors, the reply is empty, it cites any unknown `WO-/INC-/TRC-` ID, or (with no evidence) it doesn't admit that.
+- `reasoning_source` is shown in the UI.
 
-The scripted CLI version (`python -m scripts.demo --runs 3`) performs Scenes 3–5 with assertions and resets between runs; it has passed repeatedly.
+**Residual risk.** Invented numbers or causes that don't include an ID pass the validator. The UI mitigates this by labelling the text as AI wording.
 
 ---
 
-# 13. Machine Memory
+# 11. User Journey
 
-**Machine history** (Machine Memory screen, `GET /incidents/machine/{id}/memory`) is read **only from SQLite**: every incident for that machine ordered newest first, aggregated into outcome counts, downtime, recurring defects, per-category successes/failures and a full timeline. It is exact and complete; no semantic ranking.
+1. The technician enters from the landing page and opens **Report Incident**. They choose type → machine → problem → symptoms, write a description, and click Analyze.
+2. The backend runs the two recalls, maps results to SQLite, gates and orders them, stores the new incident (rolling back on a memory failure), scores it and phrases the result. The progress panel shows these stages, which take about 5–8 s with real services.
+3. The analysis page shows the decision or the withheld state, the pipeline, the reasons (checks, verdicts, AI box) and the evidence with recalled memory text.
+4. The technician records the outcome. SQLite is updated and the Hindsight document replaced, and the page confirms *memory grew*.
+5. The next similar incident recalls this outcome (same-machine or fleet pass), and the engine counts it. Machine Memory and Intelligence reflect it immediately; the Intelligence cache is invalidated by the data fingerprint.
 
-**Fleet history** is what the analysis uses: Hindsight recall over all machines of the same type (fleet pass), ranked by semantic similarity, filtered by the relevance gate. It answers "what has worked for this problem on machines like this one".
+---
 
-**How they combine in analysis.** The same-machine recall pass pulls the machine's own relevant history from Hindsight; the gate ranks those first; the scorer gives same-machine outcomes extra weight (±0.5), can reach HIGH through the same-machine rule, and downgrades when the fix failed on this machine. The UI tags same-machine evidence ("this machine") and the Memory Moment banner reports "(N on <machine>)".
+# 12. APIs
 
-**Differences.**
+All paths are under `/api`. Errors are JSON `{"detail": …}`: 404, 422 (field errors), 503 (memory unavailable, nothing saved) or 500. Swagger is at `/docs`.
+
+| Method | Path | Returns |
+|---|---|---|
+| POST | `/incidents/analyze` | `AnalysisResult`: current incident, historical incidents (similarity, relevance factors, recalled facts, recency), successful/failed/partial interventions, recommendation (action, category, confidence, basis, `confidence_checks`, evidence with verdicts, warnings, reasoning, source, supporting IDs), `pattern_alert`, `cross_machine_evidence`, `memory_contribution`, `memory_trace` |
+| GET | `/incidents/{id}` | `Incident` or 404 |
+| PATCH | `/incidents/{id}/outcome` | Updated `Incident`; 404/422/503 |
+| GET | `/incidents/machine/{id}/memory` | Summary, outcome distribution, recurring defects, what worked/failed, full timeline |
+| GET | `/dashboard/stats` | Totals, distributions, downtime, history range, memory bank, monthly memory growth |
+| GET | `/dashboard/fleet` | Catalog for forms, `hero_machine_id`, `demo_presets`, `demo_outcome` |
+| GET | `/dashboard/hero-machines` | Without vs with memory for 3 machines, trial-and-error cost, history (dry run) |
+| GET | `/dashboard/health` | `healthy/degraded`; sqlite, hindsight (bank, last error), llm |
+| GET | `/intelligence` | Full Intelligence report |
+| GET | `/intelligence/problem` | Engine result for one `machine_type` + `defect_type` (optional `machine_id`) |
+
+The dashboard and intelligence endpoints return untyped dicts in OpenAPI. The contract is instead enforced by a test against `frontend/src/types/incident.ts`.
+
+---
+
+# 13. Demo Flow
+
+The full script is in `DEMO.md`. In short:
+
+1. Landing page → Dashboard.
+2. Intelligence → **With vs without memory**:
+   - CNC-204 → bearings, LOW (3 of 7)
+   - HP-303 → relief valve, HIGH (7 of 7; trial and error cost 3 attempts and about 75 h)
+   - CV-507 → idler, HIGH
+3. **AC-407 condensate drain failure** (preset *Demo 1*): about 67 compressor work orders are recalled and none is relevant, so the recommendation is withheld.
+4. Record *Condensate drain replacement*, SUCCESS.
+5. Repeat (*Demo 2*): 1 related work order on AC-407 → recommendation at LOW (1 of 1), and the AI cites the Scene 3 ID.
+6. Machine Memory CNC-204 shows the chain.
+7. Intelligence: the replay (58 % vs 48 %) and the evolution (11 → 24).
+8. Optional: the ROI view, presented as assumptions and illustration.
+
+**Resetting.** Locally, `python -m scripts.demo --reset` clears AC-407 (`--runs 3` rehearses from the CLI). On Render, the AC-407 state persists until a redeploy.
+
+---
+
+# 14. Machine vs Fleet History
 
 | | Machine history | Fleet history |
 |---|---|---|
-| Source | SQLite | Hindsight recall → SQLite rows |
-| Scope | One machine, all problems | One machine type, relevant problems |
-| Ordering | Chronological | Similarity (this machine first in evidence) |
-| Used for | Human review, timeline, trial-and-error cost | Evidence and scoring |
-| Completeness | Exhaustive | Top-ranked, capped at 15 evidence items |
+| Source | SQLite only | Hindsight recall → SQLite rows |
+| Scope | One machine, all problems | One type, relevant problems |
+| Order | Chronological | This machine first, then similarity × recency |
+| Used for | Timeline, chains, trial-and-error cost | Evidence and scoring |
+| Completeness | Exhaustive | Top-ranked, capped at 15 |
+
+In analysis, the same-machine pass, same-machine-first ordering, ±0.5 weighting, the same-machine HIGH rule and the downgrade combine the two. The UI tags such evidence *this machine*.
 
 ---
 
-# 14. Testing
+# 15. Testing
 
-**Offline suite** (`cd backend && pytest`, 49 tests, ~1–2 s). `conftest.py` points `DATABASE_URL` at a temp SQLite file, blanks `GROQ_API_KEY` (deterministic wording), and monkeypatches `HindsightClient` with `tests/fakes.py::FakeHindsightClient` — same interface; recall scores documents by token overlap and honours tag filters; can simulate retain/recall failures.
+**Offline** (`pytest`, **73 tests**, about 2 s). The tests use a temp SQLite file, no Groq key and `FakeHindsightClient`, which honours tag filters, scores by token overlap and can simulate failures.
 
-| File | Tests |
-|---|---|
-| `test_recommendation.py` (10) | no-evidence → no action; only failures; HIGH/MEDIUM/LOW thresholds; same-machine HIGH rule; same-machine failure downgrade; winner by score; partial/unknown tallies; most recent success as example; "no history on this machine" warning |
-| `test_evidence_gate.py` (3) | same defect kept; related defect needs shared symptom + ≥0.80; same-machine-first ordering and cap |
-| `test_phrasing.py` (7) | no key; valid reply + think-tag stripping; LLM cannot change decision; invented ID rejected; API error / empty reply fallback; no-evidence reply must admit it; prompt contains computed facts |
-| `test_dataset.py` (9) | determinism; size/coverage; unique IDs; timestamp window; fleet consistency (line, valid intervention, downtime ≥ repair, severity); monotonic operating hours; mixed outcomes; confirmed cause only when plausible; hero chains present; demo problem has no history |
-| `test_memory.py` (8) | narrative content and omission of normal readings; open incident wording; tags; recall grouping and tag isolation; rollback on failed retain (create and outcome update); category/downtime defaults; delete from both stores |
-| `test_api.py` (12) | contract checker catches missing fields; health healthy/degraded; stats + fleet vs frontend types; full memory loop (analyze → outcome → recall → machine memory); recurring incident uses machine history; hero machines computed, nothing stored; 404/422 JSON errors; 503 on memory outage with nothing saved; unknown machine memory; CORS origins |
-
-**Frontend↔backend contract test.** `tests/ts_contract.py` parses the TypeScript interfaces in `frontend/src/types/incident.ts` (including `extends` and nested interface/array types) and validates real API responses against required fields — frontend/backend drift fails a Python test.
-
-**Live integration tests** (`TRACE_LIVE=1 pytest -m live`, 4 tests, ~2 min, real Hindsight + Groq, running server required). They shell out to the scripts with the real environment: health healthy with Hindsight and LLM ok; `validate_scenarios` all pass; `demo --runs 2` passes twice; `audit_data` passes.
-
-**Validation scenarios** (`scripts/validate_scenarios.py`, assertions per scenario, cleans up created incidents, resets AC-407 first):
-
-| Scenario | Incident | Result |
+| File | # | Covers |
 |---|---|---|
-| A strong history | CV-505 roller bearing noise | HIGH — idler replacement 7/7, 4 on CV-505 |
-| B conflicting | CNC-204 spindle vibration | LOW — bearings 3 of 7, 2 failed; CNC-204's failed alignment shown |
-| C sparse | AC-402 oil carryover | LOW — only 2 matches |
-| D no history | AC-407 condensate drain failure | INSUFFICIENT_DATA, no action |
-| E novel | CNC-203 chip conveyor jam (custom problem) | INSUFFICIENT_DATA; recall ran (~74 work orders) but nothing relevant |
-| F recurring | CV-507 belt mistracking | retrieves CV-507's own PARTIAL and SUCCESS |
+| `test_recommendation.py` | 16 | No evidence, only failures, thresholds, same-machine rule, downgrade, winner by score, partial/unknown, checks, verdict for every alternative |
+| `test_api.py` | 16 | Contract checker, health, stats/fleet vs TS types, full memory loop, recurring incident, hero machines, 404/422, readable 503 + nothing saved, growth, presets, CORS |
+| `test_dataset.py` | 9 | Determinism, size, IDs, timestamps, consistency, hours, mixed outcomes, plausible causes, hero chains, demo problem has no history |
+| `test_memory.py` | 8 | Narrative, tags, grouping/isolation, rollback on create and update, defaults, delete |
+| `test_intelligence.py` | 8 | Wilson ranking, replay, confidence changes, reuse, trust view, cache invalidation, contract |
+| `test_phrasing.py` | 7 | Every LLM fallback; LLM cannot change the decision |
+| `test_evidence_gate.py` | 5 | Same defect, related-defect rule, ordering, cap, recency with naive timestamps |
+| `test_insights.py` | 4 | Recency bands, pattern alert, cross-machine evidence |
 
-**Demo reset.** `scripts/demo.py --reset` deletes every AC-407 incident from SQLite and Hindsight (the generated history has none, so anything there is demo-created). Verified effective: after reset, incident 1 again gets no evidence.
+**Other checks.**
 
-**Data audit.** `scripts/audit_data.py` checks duplicate IDs, machine/type/line consistency, future timestamps, downtime vs repair time, sensor physical bounds, intervention validity per type, notes contradicting outcomes, impossible operating-hour progressions, and prints distribution statistics; `--recommendations` runs recall + scoring for every (type, problem) pair (22 distinct recommendations across 23 problems).
+- **Contract:** `tests/ts_contract.py` parses the TS interfaces (including `extends` and nested types) and validates live responses against them.
+- **Live** (`TRACE_LIVE=1 pytest -m live`, 4 tests): health, all scenarios, the demo twice from reset, and the data audit, against real Hindsight and Groq.
+- **Scenarios** (`validate_scenarios.py`):
 
-**Frontend.** `npm run typecheck` (tsc) and `npm run build` pass. There are no frontend unit/component/E2E tests and no ESLint configuration; UI flows were verified manually in a browser (form, analysis, outcome, memory loop, modal, lowercase search, backend-down state).
+  | Scenario | Result |
+  |---|---|
+  | A: CV-505 strong | HIGH 7/7 |
+  | B: CNC-204 conflicting | LOW 3/7 |
+  | C: AC-402 sparse | LOW |
+  | D: AC-407 no history | INSUFFICIENT |
+  | E: novel custom problem | INSUFFICIENT; recall ran |
+  | F: CV-507 recurring | Its own history is retrieved |
 
-**CI.** None configured.
-
----
-
-# 15. Technical Decisions
-
-1. **SQLite = truth, Hindsight = retrieval.** Outcomes and numbers must be exact and auditable; semantic memory is for finding relevant history. Every recalled item is mapped back by `document_id = incident_id`.
-2. **Deterministic scoring; LLM only for wording.** The decision cannot hallucinate and is unit-testable; the LLM improves readability and can be switched off without changing behaviour.
-3. **Recall before storing the new incident.** Prevents the incident matching itself.
-4. **Two recall passes (fleet + same machine) in parallel.** Validation showed a machine's own prior occurrences could be crowded out of the fleet top-k.
-5. **Tags instead of one bank per machine type.** Same isolation (`all_strict`), single bank to seed/administer, cross-type admin possible.
-6. **Only `world`/`experience` facts.** They carry `document_id`; observations cannot be cross-referenced to records.
-7. **Narrative retain content, abnormal readings with normal ranges.** Natural-language memory retrieves better than key-value dumps; normal readings are noise.
-8. **Relevance gate on structured `defect_type` + high-similarity related matches.** Recall always returns *something*; without a gate a novel problem would be "answered" with unrelated evidence (observed in the original code: hydraulic-press failures cited for a CNC).
-9. **Group by intervention category, not action text.** "3500 rpm" vs "3600 rpm" were counted separately before, making HIGH unreachable.
-10. **Same-machine weighting and downgrade.** A fix proven on this machine is stronger evidence; a fix that failed here is suspect.
-11. **No recommendation without evidence.** Replaced hardcoded default actions; safety/credibility over apparent helpfulness.
-12. **LLM output validation (IDs, acknowledgment) with deterministic fallback.** Cheap, strict guard against the most damaging hallucination (citing non-existent work orders).
-13. **Synthetic but modelled data.** No real plant data available; a cause→intervention→outcome model with technician behaviour produces realistic, non-trivial histories (same fix succeeds and fails; follow-ups; uncertainty) and is reproducible via a fixed seed.
-14. **Scripted hero chains merged into generated data.** Guarantees demonstrable stories and stable validation scenarios while keeping the rest emergent.
-15. **Live, computed Before/After view.** Main branch had a hardcoded comparison; replaced with a dry run through the same scorer and real trial-and-error cost, avoiding misleading "time saved" claims the data doesn't support.
-16. **Write consistency with rollback.** A failed Hindsight write reverts the SQLite change and returns 503, so the two stores never disagree.
-17. **Real health endpoint driving UI status.** Replaced an always-green indicator.
-18. **Contract test from TypeScript types.** Hand-maintained TS types are kept honest without codegen.
-19. **Forms driven by the backend catalog.** The UI can't drift from the data.
-20. **Single-page view switching (no routes).** Simplicity for a demo; trade-off listed below.
+- **Data audit:** `audit_data.py` checks integrity, bounds and consistency. `--recommendations` scores every (type, problem) pair.
+- **Frontend:** `npm run typecheck` and `npm run build`. There are no component or E2E tests and no ESLint config. CI is not configured.
 
 ---
 
-# 16. Limitations
+# 16. Technical Decisions
 
-**Data & realism**
-- All history is synthetic (clearly labelled). Thresholds (0.80 gate, cap 15, confidence rules) were tuned on this synthetic fleet and may not transfer.
-- Hero chains are scripted; validation scenario A was chosen after inspecting which problem the data supports strongly.
-- Severity is only generated for history; live reports never get a severity.
-- Live incident timestamps are "now"; no manual date entry.
-
-**Memory / retrieval**
-- For catalogued problems the gate largely reduces to "same `defect_type` among recalled candidates" — a critic can fairly say part of the relevance decision is a structured filter, not memory. Hindsight still selects/ranks candidates and provides same-machine and related-problem recall.
-- Similarity is the best fact's `semantic` score; reranker/final scores are ignored; not calibrated.
-- Hindsight `reflect()`, observations, mental models and directives are unused — Hindsight is used as retrieval, not as a reasoning memory.
-- Single shared bank; `seed_data.py` deletes and recreates it (dangerous if teammates share an account/bank).
-- Deletion uses a private SDK attribute (`_documents_api`).
-- Retain happens synchronously inside the analyze and outcome requests (adds seconds of latency).
-- Every analysis stores an incident, including exploratory ones; "open" incidents accumulate without outcomes.
-
-**Scoring**
-- No recency weighting, no similarity weighting, no use of sensor readings or suspected cause, no statistical confidence (Wilson interval etc.).
-- Free-text intervention categories group only on identical text; no normalisation or clustering.
-- "Same symptom, different cause" (HP-303) is handled only by outcome counts, not by matching the current readings to the cause.
-
-**LLM**
-- Validation catches invented IDs and missing no-evidence acknowledgment only; invented numbers/causes without IDs pass.
-- `qwen/qwen3-32b` path (think-tag stripping) untested live; no function-calling (not needed, but the brief mentions it).
-
-**Backend engineering**
-- No auth, users, roles, tenancy, or audit trail of outcome edits (PATCH overwrites).
-- New service/SDK clients per request; no connection pooling or FastAPI dependency injection.
-- Stats load all rows into Python (fine at 567, not at 500k); no pagination.
-- `/hero-machines` runs six recalls on every call; no caching (React strict mode doubles it in dev).
-- Dashboard endpoints return untyped dicts (weak OpenAPI).
-- Deprecated `on_event` startup hook; health cache is per-process.
-- Unused dependencies (`anthropic`, `aiohttp`, `python-multipart`); dev tools (`black`, `ruff`, `pytest`) in runtime requirements.
-- No Docker/compose, no CI pipeline, no migrations (schema changes require reseed).
-
-**Frontend**
-- Single route with in-memory view state: no deep links, refresh loses the current analysis, browser back doesn't work across views.
-- No frontend tests (unit, component or E2E), no ESLint config.
-- Hand-maintained TS types (mitigated by the contract test).
-- The Report form has no sensor-value inputs; readings shown in the analysis come only from the API payload.
-- Accessibility not audited; responsive layout not tested on small screens.
-
-**Process / submission**
-- Live tests and validation scripts write to and clean up the real bank (costs API calls; can collide with concurrent demos).
-- Article, social post and video required by the content guide are not in the repo.
-- API keys were shared in a chat session during development and should be rotated.
+1. **SQLite is truth, Hindsight is retrieval**, joined by `document_id = incident_id`.
+2. **Deterministic decisions; the LLM only words them.** This makes decisions testable, and the LLM is optional.
+3. **Recall before storing** the new incident.
+4. **Two parallel recall passes** (fleet + same machine).
+5. **Tags instead of a bank per type** (`all_strict`).
+6. **Only `world`/`experience` facts** (they carry document IDs).
+7. **Narrative memories** that include only abnormal readings, each with its range.
+8. **A relevance gate**, because recall always returns something.
+9. **Grouping by intervention category**, not action text.
+10. **Same-machine weighting and downgrade.**
+11. **No recommendation without evidence** (the hardcoded defaults were removed).
+12. **LLM validation** with a deterministic fallback.
+13. **Synthetic but modelled data** (cause → fix → outcome, technician behaviour, follow-ups), with a fixed seed.
+14. **Scripted hero chains** merged into the emergent history.
+15. **A live, computed before/after comparison** instead of a hardcoded one.
+16. **Rollback on memory-write failure**, with readable 503s.
+17. **A real health endpoint** that drives the UI status lights.
+18. **A contract test** built from the TS types.
+19. **Catalog-driven forms and demo presets** served by the backend.
+20. **Explainability computed in the engine** (checks, verdicts) and rendered as-is by the UI.
+21. **Intelligence reuses the engine unchanged**: replay rather than invented logs, Wilson ranking, and a fingerprint cache.
+22. **Single-page view switching with URL deep links** (`?view=`) instead of Next.js routes, which keeps the iframe landing page simple.
 
 ---
 
-# 17. Strengths
+# 17. Limitations
 
-- **Memory is central and visible.** Recall drives evidence; the UI shows the recalled memory text, recall counts, and a live before/after comparison — directly aligned with the 25% "Use of Hindsight Memory" criterion.
-- **Grounded, auditable recommendations.** Every recommendation is a function of counted outcomes with work-order IDs; the basis sentence and tally table make the decision inspectable.
-- **Honest failure modes.** No evidence → no recommendation; failed and partial repairs are first-class evidence; confidence downgrades when a fix failed on the same machine.
-- **Hallucination containment.** LLM only rewords; hard validation with deterministic fallback; UI labels AI text.
-- **Realistic, reproducible data model.** Causes, interventions, technician behaviour, follow-ups, uncertainty, operating hours, downtime — not a toy table — and deterministic via seed.
-- **Two-store consistency.** Rollback on memory-write failure; explicit 503s.
-- **Test depth for a short project.** 49 offline tests with a service fake, a TS-contract test, live integration tests, six assertion-backed scenarios, a data audit, a repeatable demo with reset.
-- **Clean separation of concerns.** Decision logic isolated in two small pure modules; plumbing elsewhere.
-- **Demo-ready.** Hero machines with real chains, one-command reset, scripted rehearsal, provenance and health visible in the UI.
+**Data.**
+
+- The history is synthetic, and the thresholds were tuned on it.
+- The hero chains are scripted.
+- Severity exists only for generated history.
+- Live timestamps are always "now".
+
+**Memory.**
+
+- The gate leans on the structured `defect_type` field.
+- The similarity is the best fact's semantic score and is uncalibrated.
+- `reflect()`, observations and mental models are unused.
+- There is a single bank, and `seed_data.py` recreates it.
+- Deletion uses a private SDK attribute.
+- Retain is synchronous (it adds seconds).
+- Every analysis stores an incident, so open incidents accumulate.
+
+**Scoring.**
+
+- There is no recency or similarity weighting of the score.
+- Sensor readings and the suspected cause are unused.
+- Free-text categories group only on identical text.
+- "Same symptom, different cause" is resolved only by counts.
+
+**LLM.** The validator only checks IDs and the admission of missing evidence.
+
+**Backend.**
+
+- There is no auth or audit trail (PATCH overwrites).
+- Clients are created per request.
+- Stats load every row.
+- `/hero-machines` makes six recalls per call without caching.
+- Several endpoints return untyped dicts.
+- Startup uses the deprecated `on_event`.
+- Requirements include unused dependencies (`anthropic`, `aiohttp`, `python-multipart`) and dev tools.
+- There is no Docker, CI or migrations.
+
+**Deployment.**
+
+- Render's free tier sleeps (30–60 s cold start).
+- The ephemeral disk means each redeploy reseeds and recreates the bank.
+- Demo state on AC-407 persists between presentations until a redeploy.
+
+**Frontend.**
+
+- View state is in memory, so a refresh loses the current analysis (deep links cover the other views).
+- There are no frontend tests and no ESLint config.
+- The TS types are hand-maintained, which the contract test mitigates.
+- The report form has no sensor inputs.
+- The **ROI simulator is assumption-driven** and the **learning scrubber's metrics are illustrative formulas**. Both are presented next to measured data, so a presenter must say so.
+- The redesign removed Judge mode; `JudgeMode.tsx` is dead code, apart from the context import.
+- The landing page is a Three.js iframe loaded from a CDN, which is heavy on low-end devices.
+- Responsive and mobile layouts are not tested.
+
+**Process.** Live tests write to the real bank, and API keys were shared in chat during development and should be rotated.
 
 ---
 
-# 18. Files Worth Reading
+# 18. Strengths
 
-1. `README.md` — the accurate high-level picture, pipeline, dataset, API, testing.
-2. `backend/app/services/analysis.py` — the pipeline in one place: recall, relevance gate, store, score, phrase, machine memory, memory-impact dry run.
-3. `backend/app/hindsight/memory.py` — how Hindsight is used: narratives, tags, two-pass recall, grouping to SQLite, consistency/rollback, stats.
-4. `backend/app/services/recommendation.py` — the entire decision logic and confidence rules (short, well-commented).
-5. `backend/app/services/phrasing.py` — the LLM prompt, the facts sent, and the validation/fallback rules.
-6. `backend/app/data/generator.py` then `catalog.py` — how the synthetic history is produced and what the fleet/defect/cause/intervention model looks like; hero stories.
-7. `frontend/src/components/IncidentAnalysis.tsx` — the main judge-facing screen and how evidence vs AI text is separated.
-8. `frontend/src/components/BeforeAfterMemory.tsx` + `backend/app/api/dashboard.py` — the live before/after memory view and health check.
-9. `backend/tests/test_api.py` + `tests/ts_contract.py` — end-to-end behaviour and the frontend/backend contract enforcement.
-10. `backend/scripts/validate_scenarios.py`, `scripts/demo.py` — acceptance scenarios and the rehearsable demo.
-11. `DEMO.md` — the intended live walkthrough.
-12. `backend/app/hindsight/client.py`, `app/db/repository.py`, `app/models/incident.py` — thin but clarify contracts.
+- **Memory is central and visible.** Recall drives the evidence, and the UI shows the recalled text, the pipeline, a live before/after comparison and the knowledge growth over time.
+- **Auditable decisions.** Every recommendation is a function of counted outcomes with IDs, plus checks and verdicts.
+- **Honesty.** No evidence means no recommendation. Failures are evidence, same-machine failures downgrade confidence, and the illustrative views are labelled.
+- **Hallucination containment.** The LLM only rewords; there is hard validation with a fallback, and the AI text is labelled.
+- **A measured learning story.** The chronological replay shows repairs that followed memory worked more often (58 % vs 48 %) with less downtime, computed rather than claimed.
+- **Realistic, reproducible data** from a causal model with a fixed seed.
+- **Consistency between the two stores**, with readable failure reasons.
+- **Verification depth.** 73 offline tests, a TS contract test, live tests, six scenarios, a data audit and a resettable demo.
+- **Polished, deployed product.** A 3D landing page, a consistent dark glass UI and accessibility basics, publicly deployed on Render.
 
 ---
 
-# 19. Project Summary
+# 19. Files Worth Reading
 
-TRACE is a troubleshooting assistant for industrial maintenance whose core idea is that the most valuable knowledge in a plant is not generic engineering knowledge but the plant's own history of what was tried on which machine and whether it worked. It turns that history into a memory that is queried every time a technician reports a fault, and it updates that memory every time a technician reports an outcome.
+1. `README.md`: the overview, pipeline, API and testing.
+2. `backend/app/services/analysis.py`: the whole pipeline, the gate and the insights.
+3. `backend/app/hindsight/memory.py`: how Hindsight is used.
+4. `backend/app/services/recommendation.py`: the decision rules, checks and verdicts.
+5. `backend/app/services/intelligence.py`: the replay and analytics.
+6. `backend/app/services/phrasing.py`: the prompt and its guards.
+7. `backend/app/data/generator.py` and `catalog.py`: the data model and hero stories.
+8. `frontend/src/components/IncidentAnalysis.tsx` and `analysis/*`: the main screen.
+9. `frontend/src/components/intelligence/*` and `BeforeAfterMemory.tsx`: the learning story.
+10. `frontend/src/app/page.tsx`, `public/landing.html` and `SliderDashboard.tsx`: the redesign.
+11. `backend/tests/test_api.py` and `tests/ts_contract.py`: end-to-end tests and the contract.
+12. `DEMO.md`, `render.yaml` and `backend/start.sh`: the demo and deployment.
 
-The system has three layers. A Next.js 14 single-page frontend provides a dashboard, an incident report form, an incident analysis screen, a per-machine memory view, and a "memory impact" modal. A FastAPI backend owns all logic. Two stores sit behind it with deliberately different roles: SQLite is the exact, authoritative record of every work order (IDs, timestamps, readings, actions, outcomes, downtime), while Hindsight — Vectorize's agent-memory service — holds each work order as a natural-language memory document and answers the question "which past incidents are like this one?". Groq (model `openai/gpt-oss-120b`) is optional and used only to reword results.
+---
 
-The heart of the system is the analysis pipeline. When a technician submits a report (machine, problem, symptoms, description), the backend first recalls from Hindsight — before storing the new incident so it can't match itself. Two recall calls run in parallel against one bank: one restricted by tag to the machine's equipment type (the fleet), and one restricted to that specific machine, so a machine's own recurring history is never pushed out by look-alikes elsewhere. Only fact types that carry a document ID are requested; facts are grouped per document, the best semantic score becomes the incident's similarity, and the authoritative rows are loaded from SQLite. A deterministic relevance gate keeps incidents of the same problem type, or of a related problem that shares a symptom and scores at least 0.80 similarity; the machine's own incidents are ordered first and the set is capped at fifteen. This gate exists because semantic recall always returns something, and without it a novel problem would be "answered" with unrelated history.
+# 20. Summary
 
-Scoring is plain Python. Evidence is grouped by intervention category; each category earns one point per success, half a point per partial success, minus one per failure, with an extra half point up or down for outcomes on the same machine. The winner is the best-scoring category that has actually worked at least once. Confidence follows explicit rules: HIGH needs at least three successes at 75% or better, or two successes on this machine with no failures there and 60% overall; MEDIUM needs two successes at 50%; anything else positive is LOW; and if a fix failed on this machine and never worked there, confidence is downgraded. If there is no evidence, or nothing has ever worked, TRACE returns "No evidence-backed recommendation" rather than a generic suggestion. The result includes a one-sentence computed basis, a per-intervention tally with work-order IDs, and warnings about what failed.
+TRACE starts from the idea that a plant's most valuable troubleshooting knowledge is its own history: what was tried, on which machine, and whether it worked. It turns that history into memory that is queried whenever a fault is reported and updated whenever an outcome is recorded.
 
-Only after the decision is fixed does the LLM see it. The prompt contains only computed facts — the decision, the tallies with IDs, the machine's own recent outcomes, the warnings, and a reference wording — and instructs the model to rephrase without adding anything. Its output is rejected in favour of the deterministic text if the call fails, the reply is empty, it cites any work-order ID not in the evidence, or, for a no-evidence case, it fails to say there is no evidence. The UI renders this text in a visually separate box labelled as AI-written wording.
+**Architecture.** A Next.js frontend (3D landing page, dashboard, report and analysis flow, machine memory, TRACE Intelligence and an ROI view) talks to a FastAPI backend that owns all the logic. SQLite holds exact work orders. Hindsight holds each one as a natural-language memory and answers "which past incidents are like this one?". Groq only rewords computed results.
 
-When the technician records what they did (intervention type, action, outcome, cause, repair time, downtime, notes), SQLite is updated and the Hindsight document is re-retained with replace semantics; if the memory write fails, the SQLite change is rolled back and the API returns 503, so the two stores never disagree. The next similar incident will retrieve this outcome and the scorer will count it — the before/after loop at the centre of the demo: a brand-new condensate-drain problem on compressor AC-407 gets no recommendation; after the fix is recorded, the next similar report recalls it, recommends it with LOW confidence (one success), and the explanation cites the earlier work order.
+**Analysis.** TRACE recalls from Hindsight before storing the new incident. It runs two tag-filtered passes (fleet and same machine), maps the facts to SQLite rows, and applies a deterministic relevance gate. It then scores interventions with explicit rules: successes, partials and failures, same-machine weighting, and confidence thresholds with a same-machine downgrade. It either recommends the best proven fix, with a checklist and a verdict for every alternative, or honestly withholds a recommendation. The LLM's wording is validated against the evidence IDs. Recording an outcome updates both stores atomically.
 
-Because no real plant data was available, the repository includes a deterministic generator that produces 567 synthetic but operationally realistic work orders over fifteen months for 39 machines across five equipment types (CNC machining centers, hydraulic presses, screw air compressors, belt conveyors, injection molding machines). It models root causes per defect, which interventions truly fix which cause, technicians suspecting the wrong cause or trying cheap fixes first, follow-up work orders after failed or partial repairs, uncertain records, rare one-off faults, operating hours, downtime and severity. Outcomes are 47% success, 20% partial, 23% failed, 10% unverified, and most intervention types both succeed and fail somewhere. Three "hero" machines have scripted, explainable chains (CNC-204 bearings vs alignment; HP-303 same symptom with two different causes a year apart; CV-507 a temporary fix before the real one), and a dashboard modal compares, live, what the same scorer recommends for them with and without memory, alongside what trial and error actually cost each machine.
+**Data.** 567 synthetic but causally modelled work orders across 39 machines and 5 equipment types. Three showcase machines have explainable repair chains, and a live comparison shows each recommendation with and without memory.
 
-Quality is backed by 49 offline tests (with an in-memory Hindsight fake) covering scoring rules, the gate, LLM guards, dataset invariants, the memory layer and the full HTTP flow; a contract test that validates API responses against the frontend's TypeScript interfaces; four opt-in live tests; six assertion-backed validation scenarios; a data-quality audit; and a demo script that resets and replays the memory loop reliably.
+**Intelligence.** The Intelligence page replays history chronologically. Coverage grew from 11 to 24 of 25 problems, and repairs that followed memory's recommendation worked 58 % of the time versus 48 % with less downtime. All of it is computed by the same engine.
 
-The main weaknesses are those of a short, demo-focused build: synthetic data and tuned thresholds, a relevance gate that leans on a structured field for catalogued problems, scoring without recency or similarity weighting, limited LLM validation beyond IDs, synchronous memory writes, no authentication, no routing or frontend tests, no CI or containerisation, and a seed script that rebuilds the shared memory bank. The strengths are a memory-centric design that is visible to the user, decisions that are deterministic and auditable, honest behaviour when evidence is missing, and unusually thorough verification for the project's size.
+**Quality and weaknesses.** Quality rests on 73 offline tests, a frontend contract test, live tests, validation scenarios and a data audit. The weaknesses are those of a short, demo-focused build: synthetic data, a gate that leans on a structured field, unweighted scoring, limited LLM validation, synchronous memory writes, no auth or CI, an ephemeral free-tier deployment, and ROI and scrubber views that are illustrative rather than measured.
