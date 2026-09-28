@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # Hindsight Configuration
     hindsight_api_url: str = "http://localhost:8100"
     hindsight_api_key: str = ""
-    hindsight_namespace: str = "trace-manufacturing"
+    hindsight_namespace: str = "trace-maintenance"
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./trace.db"

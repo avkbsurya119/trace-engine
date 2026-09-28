@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { DashboardStats } from "@/types/incident";
+import { formatDay, humanize } from "@/lib/utils";
 import {
   AlertTriangle,
   CheckCircle,
@@ -10,6 +11,7 @@ import {
   HelpCircle,
   Plus,
   Server,
+  Clock,
 } from "lucide-react";
 
 interface DashboardProps {
@@ -54,8 +56,14 @@ export function Dashboard({
         <div>
           <h2 className="text-2xl font-bold text-industrial-900">Dashboard</h2>
           <p className="text-industrial-600">
-            Manufacturing incident memory overview
+            Maintenance memory overview
           </p>
+          {stats?.history_start && stats?.history_end && (
+            <p className="text-xs text-gray-500 mt-1">
+              Synthetic, operationally realistic work-order history · {formatDay(stats.history_start)} –{" "}
+              {formatDay(stats.history_end)} · Hindsight bank {stats.memory_bank}
+            </p>
+          )}
         </div>
         <button
           onClick={onReportIncident}
@@ -81,19 +89,19 @@ export function Dashboard({
               color="bg-white"
             />
             <StatCard
-              title="With Outcomes"
-              value={stats.incidents_with_outcome}
-              icon={<CheckCircle className="w-6 h-6 text-green-500" />}
+              title="Downtime logged"
+              value={`${Math.round(stats.total_downtime_hours).toLocaleString()} h`}
+              icon={<Clock className="w-6 h-6 text-amber-500" />}
               color="bg-white"
             />
             <StatCard
-              title="Unique Machines"
-              value={stats.unique_machines}
+              title="Machines"
+              value={`${stats.unique_machines} (${Object.keys(stats.machine_type_distribution ?? {}).length} types)`}
               icon={<Server className="w-6 h-6 text-blue-500" />}
               color="bg-white"
             />
             <StatCard
-              title="Success Rate"
+              title="Repairs that worked"
               value={`${
                 stats.incidents_with_outcome > 0
                   ? Math.round(
@@ -144,17 +152,17 @@ export function Dashboard({
           {/* Defect Types */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-industrial-900 mb-4">
-              Defect Type Distribution
+              Most frequent problems
             </h3>
             {Object.keys(stats.defect_type_distribution).length > 0 ? (
               <div className="space-y-3">
                 {Object.entries(stats.defect_type_distribution)
                   .sort(([, a], [, b]) => b - a)
-                  .slice(0, 5)
+                  .slice(0, 8)
                   .map(([defect, count]) => (
                     <div key={defect} className="flex items-center gap-4">
-                      <span className="w-40 text-sm text-industrial-700">
-                        {defect}
+                      <span className="w-52 text-sm text-industrial-700">
+                        {humanize(defect)}
                       </span>
                       <div className="flex-1 bg-gray-200 rounded-full h-4">
                         <div

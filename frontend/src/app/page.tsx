@@ -54,6 +54,7 @@ export default function Home() {
       case "analysis":
         return analysisResult ? (
           <IncidentAnalysis
+            key={analysisResult.current_incident.incident_id}
             result={analysisResult}
             onBack={() => setCurrentView("dashboard")}
             onViewMachineMemory={handleViewMachineMemory}
@@ -67,6 +68,7 @@ export default function Home() {
       case "memory":
         return (
           <MachineMemory
+            key={selectedMachineId}
             machineId={selectedMachineId}
             onBack={() => setCurrentView("dashboard")}
           />

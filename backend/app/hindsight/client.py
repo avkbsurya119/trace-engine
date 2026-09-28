@@ -1,10 +1,15 @@
 """
 Hindsight SDK Client
 
-TRACE's interface to the Hindsight persistent memory service.
+TRACE's thin interface to the Hindsight persistent memory service.
+Every TRACE incident is one Hindsight document whose document_id is the
+SQLite incident_id, so recalled memories can always be traced back to the
+exact structured record.
 """
 
-from typing import Dict, Any, List, Optional
+import inspect
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from hindsight_client import Hindsight
 
@@ -14,225 +19,121 @@ from app.core.config import settings
 class HindsightClient:
     """Client for interacting with Hindsight using the official Python SDK."""
 
-    def __init__(self):
-        self.base_url = settings.hindsight_api_url
-        self.api_key = settings.hindsight_api_key
-        self.namespace = settings.hindsight_namespace
-
+    def __init__(self, bank_id: Optional[str] = None):
+        self.bank_id = bank_id or settings.hindsight_namespace
         self._client = Hindsight(
-            base_url=self.base_url,
-            api_key=self.api_key,
+            base_url=settings.hindsight_api_url,
+            api_key=settings.hindsight_api_key,
         )
 
     async def close(self):
-        """Close the Hindsight SDK client."""
         await self._client.aclose()
 
-    async def store_memory(
+    # ------------------------------------------------------------------
+    # Retain
+    # ------------------------------------------------------------------
+
+    async def retain(
         self,
-        memory_id: str,
-        content: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Store a TRACE incident in Hindsight.
+        document_id: str,
+        narrative: str,
+        tags: List[str],
+        metadata: Dict[str, Any],
+        timestamp: Optional[datetime] = None,
+        replace: bool = False,
+    ) -> None:
+        """Retain (or re-retain) one incident narrative."""
 
-        The incident ID is preserved as Hindsight's document_id so that
-        the memory can be traced back to the structured SQLite record.
-        """
-
-        result = await self._client.aretain(
-            bank_id=self.namespace,
-            content=self._content_to_text(content),
-            document_id=memory_id,
-            metadata=self._stringify_metadata(metadata),
+        await self._client.aretain(
+            bank_id=self.bank_id,
+            content=narrative,
+            document_id=document_id,
+            tags=tags,
+            metadata=self._stringify(metadata),
+            timestamp=timestamp,
+            update_mode="replace" if replace else None,
         )
 
-        return self._response_to_dict(result)
+    async def retain_batch(self, items: List[Dict[str, Any]]) -> int:
+        """
+        Retain many incident narratives in one call.
 
-    async def search_memories(
+        Each item: {document_id, narrative, tags, metadata, timestamp}.
+        """
+
+        payload = [
+            {
+                "content": item["narrative"],
+                "document_id": item["document_id"],
+                "tags": item["tags"],
+                "metadata": self._stringify(item["metadata"]),
+                "timestamp": item["timestamp"].isoformat() if item.get("timestamp") else None,
+            }
+            for item in items
+        ]
+        result = await self._client.aretain_batch(bank_id=self.bank_id, items=payload)
+        return getattr(result, "items_count", len(items))
+
+    # ------------------------------------------------------------------
+    # Recall
+    # ------------------------------------------------------------------
+
+    async def recall(
         self,
         query: str,
-        filters: Optional[Dict[str, Any]] = None,
-        limit: int = 10,
+        tags: Optional[List[str]] = None,
+        max_tokens: int = 6000,
     ) -> List[Dict[str, Any]]:
         """
-        Recall relevant historical incidents from Hindsight.
+        Semantic recall restricted to facts that belong to a document
+        (world/experience facts carry document_id; consolidated
+        observations do not, so they cannot be cross-referenced).
         """
-
-        recall_query = query
-
-        if filters:
-            filter_text = ", ".join(
-                f"{key}={value}"
-                for key, value in filters.items()
-                if value is not None
-            )
-
-            if filter_text:
-                recall_query = f"{query}. Relevant constraints: {filter_text}"
 
         result = await self._client.arecall(
-            bank_id=self.namespace,
-            query=recall_query,
-            max_tokens=max(512, limit * 256),
-        )
-
-        return self._extract_results(result, limit)
-
-    async def get_memory(
-        self,
-        memory_id: str,
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve a specific memory.
-
-        Hindsight recall is semantic rather than a direct document lookup,
-        so this method searches for the supplied document/incident ID.
-        """
-
-        results = await self.search_memories(
-            query=f"incident {memory_id}",
-            filters={"incident_id": memory_id},
-            limit=1,
-        )
-
-        return results[0] if results else None
-
-    async def update_memory(
-        self,
-        memory_id: str,
-        content: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Update an existing memory by retaining the updated incident content.
-        """
-
-        result = await self._client.aretain(
-            bank_id=self.namespace,
-            content=self._content_to_text(content),
-            document_id=memory_id,
-            metadata=self._stringify_metadata(metadata),
-            update_mode="replace",
-        )
-
-        return self._response_to_dict(result)
-
-    async def delete_memory(self, memory_id: str) -> bool:
-        """
-        Hindsight document deletion is not part of the client interface
-        currently used by TRACE.
-
-        Keep this compatibility method without issuing an unsafe request.
-        """
-        return False
-
-    async def list_memories(
-        self,
-        filters: Optional[Dict[str, Any]] = None,
-        limit: int = 100,
-        offset: int = 0,
-    ) -> List[Dict[str, Any]]:
-        """
-        Hindsight is recall-oriented rather than a traditional CRUD store.
-
-        Use a broad semantic recall query when callers request a list.
-        """
-
-        query = "historical manufacturing machine incidents"
-
-        if filters:
-            filter_text = ", ".join(
-                f"{key}={value}"
-                for key, value in filters.items()
-                if value is not None
-            )
-
-            if filter_text:
-                query += f" matching {filter_text}"
-
-        results = await self.search_memories(
+            bank_id=self.bank_id,
             query=query,
-            limit=limit + offset,
+            types=["world", "experience"],
+            tags=tags,
+            tags_match="all_strict" if tags else "any",
+            max_tokens=max_tokens,
+        )
+        return [item.model_dump() for item in (result.results or [])]
+
+    # ------------------------------------------------------------------
+    # Bank / document management (seeding and demo reset)
+    # ------------------------------------------------------------------
+
+    async def delete_document(self, document_id: str) -> bool:
+        try:
+            response = self._client._documents_api.delete_document(
+                bank_id=self.bank_id,
+                document_id=document_id,
+            )
+            if inspect.isawaitable(response):
+                await response
+            return True
+        except Exception:
+            return False
+
+    async def delete_bank(self) -> None:
+        try:
+            await self._client.adelete_bank(bank_id=self.bank_id)
+        except Exception:
+            # Bank did not exist yet.
+            pass
+
+    async def create_bank(self, mission: str) -> None:
+        await self._client.acreate_bank(
+            bank_id=self.bank_id,
+            name="TRACE maintenance memory",
+            mission=mission,
         )
 
-        return results[offset:offset + limit]
-
     @staticmethod
-    def _content_to_text(content: Dict[str, Any]) -> str:
-        """
-        Convert structured incident data into natural language.
-
-        Hindsight's retain operation is designed to process natural-language
-        memory content.
-        """
-
-        parts = []
-
-        for key, value in content.items():
-            if value is None:
-                continue
-
-            label = key.replace("_", " ").strip().title()
-            parts.append(f"{label}: {value}")
-
-        return "\n".join(parts)
-
-    @staticmethod
-    def _stringify_metadata(
-        metadata: Optional[Dict[str, Any]],
-    ) -> Dict[str, str]:
-        """Convert metadata values to strings as required by the SDK."""
-
-        if not metadata:
-            return {}
-
+    def _stringify(metadata: Dict[str, Any]) -> Dict[str, str]:
         return {
             str(key): str(value)
-            for key, value in metadata.items()
+            for key, value in (metadata or {}).items()
             if value is not None
         }
-
-    @staticmethod
-    def _response_to_dict(result: Any) -> Dict[str, Any]:
-        """Convert an SDK response model into a JSON-compatible dictionary."""
-
-        if hasattr(result, "model_dump"):
-            return result.model_dump()
-
-        if hasattr(result, "dict"):
-            return result.dict()
-
-        if isinstance(result, dict):
-            return result
-
-        return {"result": str(result)}
-
-    @staticmethod
-    def _extract_results(
-        result: Any,
-        limit: int,
-    ) -> List[Dict[str, Any]]:
-        """Extract recall results from the SDK response."""
-
-        if hasattr(result, "results"):
-            raw_results = result.results
-        elif isinstance(result, dict):
-            raw_results = result.get("results", [])
-        else:
-            raw_results = []
-
-        extracted = []
-
-        for item in raw_results[:limit]:
-            if hasattr(item, "model_dump"):
-                extracted.append(item.model_dump())
-            elif hasattr(item, "dict"):
-                extracted.append(item.dict())
-            elif isinstance(item, dict):
-                extracted.append(item)
-            else:
-                extracted.append({"result": str(item)})
-
-        return extracted

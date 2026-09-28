@@ -31,6 +31,15 @@ class IncidentCreate(BaseModel):
     suspected_root_cause: Optional[str] = Field(
         default=None, description="Initial suspected root cause"
     )
+    operating_hours: Optional[int] = Field(
+        default=None, description="Machine hour meter reading at time of incident"
+    )
+    severity: Optional[str] = Field(
+        default=None, description="LOW, MEDIUM, HIGH or CRITICAL"
+    )
+    technician_id: Optional[str] = Field(
+        default=None, description="Technician assigned to the work order"
+    )
 
 
 class Incident(IncidentCreate):
@@ -58,6 +67,12 @@ class Incident(IncidentCreate):
     technician_notes: Optional[str] = Field(
         default=None, description="Additional notes from technician"
     )
+    intervention_category: Optional[str] = Field(
+        default=None, description="Normalised intervention type used to group evidence"
+    )
+    downtime_minutes: Optional[int] = Field(
+        default=None, description="Total machine downtime for this incident"
+    )
 
 
 class IncidentUpdate(BaseModel):
@@ -75,6 +90,10 @@ class IncidentUpdate(BaseModel):
         default=None, description="Time to resolve"
     )
     technician_notes: Optional[str] = Field(default=None, description="Additional notes")
+    intervention_category: Optional[str] = Field(
+        default=None, description="Intervention type; defaults to the action text"
+    )
+    downtime_minutes: Optional[int] = Field(default=None, description="Total downtime")
 
 
 class IncidentOutcome(BaseModel):
@@ -100,6 +119,26 @@ class HistoricalIncident(BaseModel):
     relevance_factors: List[str] = Field(
         default_factory=list, description="Why this incident is relevant"
     )
+    recalled_facts: List[str] = Field(
+        default_factory=list, description="Memory text Hindsight returned for this incident"
+    )
+
+
+class EvidenceSummary(BaseModel):
+    """Deterministic tally of one intervention type across the evidence."""
+
+    intervention_category: str
+    example_action: str = Field(..., description="Most recent action text in this category")
+    successes: int = 0
+    partials: int = 0
+    failures: int = 0
+    unknowns: int = 0
+    same_machine_successes: int = 0
+    same_machine_failures: int = 0
+    score: float = Field(..., description="successes + 0.5*partials - failures, same-machine weighted")
+    incident_ids: Dict[str, List[str]] = Field(
+        default_factory=dict, description="Incident IDs keyed by outcome"
+    )
 
 
 class Recommendation(BaseModel):
@@ -116,6 +155,15 @@ class Recommendation(BaseModel):
     warnings: List[str] = Field(
         default_factory=list, description="Any cautions or warnings"
     )
+    intervention_category: Optional[str] = Field(
+        default=None, description="Winning intervention type, None when there is no evidence-backed action"
+    )
+    basis: str = Field(
+        default="", description="One computed sentence stating why the confidence level was assigned"
+    )
+    evidence: List[EvidenceSummary] = Field(
+        default_factory=list, description="Per-intervention tallies the decision was computed from"
+    )
     reasoning_source: str = Field(
         default="deterministic",
         description="Who wrote the reasoning text: 'llm' or 'deterministic' (fallback)",
@@ -129,7 +177,12 @@ class AnalysisResult(BaseModel):
     historical_incidents: List[HistoricalIncident] = Field(default_factory=list)
     successful_interventions: List[Dict[str, Any]] = Field(default_factory=list)
     failed_interventions: List[Dict[str, Any]] = Field(default_factory=list)
+    partial_interventions: List[Dict[str, Any]] = Field(default_factory=list)
     recommendation: Recommendation
     memory_contribution: str = Field(
         ..., description="Explanation of how memory contributed to analysis"
+    )
+    memory_trace: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="What Hindsight recall returned and how much of it passed the relevance gate",
     )

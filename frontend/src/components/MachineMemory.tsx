@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { cn, formatDate, getOutcomeBgColor } from "@/lib/utils";
+import { cn, formatDay, formatHours, getOutcomeBgColor, humanize } from "@/lib/utils";
 import type { MachineMemory as MachineMemoryType } from "@/types/incident";
 import {
   ArrowLeft,
@@ -28,6 +28,9 @@ export function MachineMemory({ machineId, onBack }: Props) {
 
   useEffect(() => {
     async function fetchMemory() {
+      setLoading(true);
+      setError(null);
+      setMemory(null);
       if (!machineId) {
         setLoading(false);
         return;
@@ -132,12 +135,16 @@ export function MachineMemory({ machineId, onBack }: Props) {
         </button>
         <div>
           <h2 className="text-2xl font-bold text-industrial-900">Machine Memory</h2>
-          <p className="text-industrial-600">{machineId}</p>
+          <p className="text-industrial-600">
+            {machineId}
+            {memory?.model ? ` · ${memory.model}` : ""}
+            {memory?.production_line ? ` · ${memory.production_line}` : ""}
+          </p>
         </div>
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-industrial-100 rounded-lg">
@@ -158,11 +165,9 @@ export function MachineMemory({ machineId, onBack }: Props) {
               <CheckCircle className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Successful Fixes</p>
+              <p className="text-sm text-gray-500">Repairs that worked</p>
               <p className="text-2xl font-bold text-industrial-900">
-                {memory?.successful_interventions
-                  ? Object.keys(memory.successful_interventions).length
-                  : 0}
+                {memory?.outcome_distribution?.SUCCESS ?? 0}
               </p>
             </div>
           </div>
@@ -174,11 +179,23 @@ export function MachineMemory({ machineId, onBack }: Props) {
               <XCircle className="w-6 h-6 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Failed Attempts</p>
+              <p className="text-sm text-gray-500">Failed attempts</p>
               <p className="text-2xl font-bold text-industrial-900">
-                {memory?.failed_interventions
-                  ? Object.keys(memory.failed_interventions).length
-                  : 0}
+                {memory?.outcome_distribution?.FAILED ?? 0}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-amber-100 rounded-lg">
+              <Clock className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Total downtime</p>
+              <p className="text-2xl font-bold text-industrial-900">
+                {memory?.total_downtime_hours ?? 0} h
               </p>
             </div>
           </div>
@@ -202,7 +219,7 @@ export function MachineMemory({ machineId, onBack }: Props) {
                   <div className="flex-1">
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium text-gray-700">
-                        {defect}
+                        {humanize(defect)}
                       </span>
                       <span className="text-sm text-gray-500">{count} incidents</span>
                     </div>
@@ -226,60 +243,6 @@ export function MachineMemory({ machineId, onBack }: Props) {
           )}
         </div>
 
-        {/* Recent Incidents Timeline */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-industrial-600" />
-            <h3 className="text-lg font-semibold text-industrial-900">
-              Recent Incidents
-            </h3>
-          </div>
-
-          {memory?.recent_incidents && memory.recent_incidents.length > 0 ? (
-            <div className="space-y-3">
-              {memory.recent_incidents.map((incident) => (
-                <div
-                  key={incident.incident_id}
-                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                >
-                  <div
-                    className={cn(
-                      "w-3 h-3 rounded-full flex-shrink-0",
-                      incident.action_outcome === "SUCCESS"
-                        ? "bg-green-500"
-                        : incident.action_outcome === "FAILED"
-                        ? "bg-red-500"
-                        : incident.action_outcome === "PARTIAL"
-                        ? "bg-amber-500"
-                        : "bg-gray-400"
-                    )}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {incident.defect_type}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatDate(incident.timestamp)}
-                    </p>
-                  </div>
-                  {incident.action_outcome && (
-                    <span
-                      className={cn(
-                        "text-xs px-2 py-1 rounded flex-shrink-0",
-                        getOutcomeBgColor(incident.action_outcome)
-                      )}
-                    >
-                      {incident.action_outcome}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 text-sm">No recent incidents.</p>
-          )}
-        </div>
-
         {/* Successful Interventions */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -297,7 +260,7 @@ export function MachineMemory({ machineId, onBack }: Props) {
                   <div key={action} className="p-3 bg-green-50 rounded-lg">
                     <p className="font-medium text-green-800">{action}</p>
                     <p className="text-sm text-green-600 mt-1">
-                      Resolved: {defects.join(", ")}
+                      Resolved: {countList(defects)}
                     </p>
                   </div>
                 )
@@ -327,7 +290,7 @@ export function MachineMemory({ machineId, onBack }: Props) {
                   <div key={action} className="p-3 bg-red-50 rounded-lg">
                     <p className="font-medium text-red-800">{action}</p>
                     <p className="text-sm text-red-600 mt-1">
-                      Failed for: {defects.join(", ")}
+                      Failed for: {countList(defects)}
                     </p>
                   </div>
                 )
@@ -339,38 +302,63 @@ export function MachineMemory({ machineId, onBack }: Props) {
         </div>
       </div>
 
-      {/* Memory Insight */}
-      <div className="bg-gradient-to-r from-industrial-50 to-purple-50 rounded-lg border border-industrial-200 p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-white rounded-lg shadow-sm">
-            <TrendingUp className="w-6 h-6 text-industrial-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-industrial-900 mb-1">
-              Memory Insight
-            </h3>
-            <p className="text-industrial-700">
-              This machine has {memory?.total_incidents || 0} incident(s) in memory.
-              {memory?.recurring_defects && memory.recurring_defects.length > 0 && (
-                <span>
-                  {" "}
-                  The most common issue is{" "}
-                  <strong>{memory.recurring_defects[0][0]}</strong> with{" "}
-                  {memory.recurring_defects[0][1]} occurrence(s).
-                </span>
-              )}
-              {memory?.successful_interventions &&
-                Object.keys(memory.successful_interventions).length > 0 && (
-                  <span>
-                    {" "}
-                    TRACE has learned {Object.keys(memory.successful_interventions).length}{" "}
-                    successful intervention(s) that can be applied to future incidents.
-                  </span>
-                )}
-            </p>
-          </div>
+      {/* Maintenance timeline */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="w-5 h-5 text-industrial-600" />
+          <h3 className="text-lg font-semibold text-industrial-900">Maintenance timeline</h3>
+          <span className="ml-auto text-xs text-gray-500">Newest first · from the work-order record</span>
         </div>
+        <ol className="relative border-l border-gray-200 ml-2 space-y-4">
+          {(memory?.timeline ?? []).map((entry) => (
+            <li key={entry.incident_id} className="ml-4">
+              <span
+                className={cn(
+                  "absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full border-2 border-white",
+                  entry.action_outcome === "SUCCESS"
+                    ? "bg-green-500"
+                    : entry.action_outcome === "FAILED"
+                    ? "bg-red-500"
+                    : entry.action_outcome === "PARTIAL"
+                    ? "bg-amber-500"
+                    : "bg-gray-400"
+                )}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-gray-900">{humanize(entry.defect_type)}</span>
+                <span className="text-xs text-gray-500">
+                  {formatDay(entry.timestamp)} · {entry.incident_id}
+                  {entry.technician_id ? ` · ${entry.technician_id}` : ""}
+                  {entry.operating_hours ? ` · ${entry.operating_hours.toLocaleString()} h` : ""}
+                </span>
+                <span className={cn("text-xs px-2 py-0.5 rounded", getOutcomeBgColor(entry.action_outcome))}>
+                  {entry.action_outcome ?? "OPEN"}
+                </span>
+              </div>
+              {entry.action_taken ? (
+                <p className="text-sm text-gray-700 mt-0.5">
+                  {entry.intervention_category && <span className="font-medium">{entry.intervention_category}: </span>}
+                  {entry.action_taken}
+                  <span className="text-gray-500"> · downtime {formatHours(entry.downtime_minutes)}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 mt-0.5">No outcome recorded yet.</p>
+              )}
+              {entry.technician_notes && <p className="text-xs text-gray-500 mt-0.5">“{entry.technician_notes}”</p>}
+            </li>
+          ))}
+        </ol>
       </div>
     </div>
   );
+}
+
+function countList(items: string[]): string {
+  const counts = items.reduce<Record<string, number>>((acc, item) => {
+    acc[item] = (acc[item] ?? 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts)
+    .map(([item, n]) => (n > 1 ? `${humanize(item)} ×${n}` : humanize(item)))
+    .join(", ");
 }

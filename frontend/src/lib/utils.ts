@@ -68,3 +68,28 @@ export function getConfidenceColor(confidence: string): string {
       return "text-gray-600";
   }
 }
+
+/**
+ * "spindle_vibration" -> "Spindle vibration"
+ */
+export function humanize(value?: string | null): string {
+  if (!value) return "";
+  const text = value.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
+ * Format a date (no time) for historical records
+ */
+export function formatDay(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("en-GB", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function formatHours(minutes?: number | null): string {
+  if (minutes === undefined || minutes === null) return "-";
+  return minutes < 60 ? `${minutes} min` : `${(minutes / 60).toFixed(1)} h`;
+}

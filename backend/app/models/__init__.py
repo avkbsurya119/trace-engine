@@ -7,6 +7,7 @@ from .incident import (
     HistoricalIncident,
     AnalysisResult,
     Recommendation,
+    EvidenceSummary,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "HistoricalIncident",
     "AnalysisResult",
     "Recommendation",
+    "EvidenceSummary",
 ]
