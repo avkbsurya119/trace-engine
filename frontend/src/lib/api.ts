@@ -46,6 +46,22 @@ async function fetchAPI<T>(
 
 const enc = encodeURIComponent;
 
+// The fleet catalog is static per backend run and the hero comparison is
+// expensive (six recalls), so both are fetched once per page session.
+let fleetCache: Promise<Fleet> | null = null;
+let heroCache: Promise<{ hero_machines: HeroMachine[] }> | null = null;
+
+function cached<T>(get: () => Promise<T> | null, set: (p: Promise<T> | null) => void, load: () => Promise<T>) {
+  const existing = get();
+  if (existing) return existing;
+  const promise = load().catch((err) => {
+    set(null); // do not cache failures
+    throw err;
+  });
+  set(promise);
+  return promise;
+}
+
 export const api = {
   /**
    * Submit an incident for analysis
@@ -65,14 +81,15 @@ export const api = {
   /**
    * Record the outcome of an incident
    */
-  recordOutcome: (
-    incidentId: string,
-    update: IncidentUpdate
-  ): Promise<Incident> =>
-    fetchAPI<Incident>(`/incidents/${enc(incidentId)}/outcome`, {
+  // Recording an outcome changes what memory knows, so the cached hero
+  // comparison is dropped.
+  recordOutcome: (incidentId: string, update: IncidentUpdate): Promise<Incident> => {
+    heroCache = null;
+    return fetchAPI<Incident>(`/incidents/${enc(incidentId)}/outcome`, {
       method: "PATCH",
       body: JSON.stringify(update),
-    }),
+    });
+  },
 
   /**
    * Get machine memory/history
@@ -89,13 +106,16 @@ export const api = {
   /**
    * Machine types, machines, defect types and intervention categories
    */
-  getFleet: (): Promise<Fleet> => fetchAPI<Fleet>("/dashboard/fleet"),
+  getFleet: (): Promise<Fleet> =>
+    cached(() => fleetCache, (p) => (fleetCache = p), () => fetchAPI<Fleet>("/dashboard/fleet")),
 
   /**
    * Showcase machines with a live with/without-memory comparison
    */
-  getHeroMachines: (): Promise<{ hero_machines: HeroMachine[] }> =>
-    fetchAPI("/dashboard/hero-machines"),
+  getHeroMachines: (options?: { refresh?: boolean }): Promise<{ hero_machines: HeroMachine[] }> => {
+    if (options?.refresh) heroCache = null;
+    return cached(() => heroCache, (p) => (heroCache = p), () => fetchAPI("/dashboard/hero-machines"));
+  },
 
   /**
    * Health check

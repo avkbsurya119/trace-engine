@@ -112,6 +112,17 @@ export interface EvidenceSummary {
   same_machine_failures: number;
   score: number;
   incident_ids: Partial<Record<ActionOutcome, string[]>>;
+  attempts: number;
+  success_rate: number | null;
+  verdict: "selected" | "rejected";
+  verdict_reason: string;
+}
+
+export interface ConfidenceCheck {
+  level: "EVIDENCE" | "HIGH" | "MEDIUM" | "DOWNGRADE";
+  rule: string;
+  passed: boolean;
+  detail: string;
 }
 
 export interface Recommendation {
@@ -123,6 +134,7 @@ export interface Recommendation {
   intervention_category?: string | null;
   basis: string;
   evidence: EvidenceSummary[];
+  confidence_checks: ConfidenceCheck[];
   reasoning_source?: "llm" | "deterministic";
 }
 
@@ -173,6 +185,14 @@ export interface DashboardStats {
   history_start: string | null;
   history_end: string | null;
   memory_bank: string;
+  memory_growth: MemoryGrowthPoint[];
+}
+
+export interface MemoryGrowthPoint {
+  month: string;
+  incidents: number;
+  cumulative_incidents: number;
+  cumulative_outcomes: number;
 }
 
 export interface FleetMachineType {
@@ -184,8 +204,16 @@ export interface FleetMachineType {
   hero_machine_id?: string | null;
 }
 
+export interface DemoPreset {
+  key: string;
+  label: string;
+  incident: IncidentCreate;
+}
+
 export interface Fleet {
   machine_types: FleetMachineType[];
+  demo_presets: DemoPreset[];
+  demo_outcome: IncidentUpdate;
 }
 
 export interface MachineTimelineEntry {
