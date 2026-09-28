@@ -23,6 +23,7 @@ from typing import Dict, List
 
 from app.models import (
     ActionOutcome,
+    ConfidenceCheck,
     EvidenceSummary,
     HistoricalIncident,
     Incident,
@@ -65,9 +66,14 @@ class RecommendationEngine:
                 supporting_incidents=[],
                 warnings=["No historical evidence: do not treat any action as proven for this problem."],
                 evidence=[],
+                confidence_checks=[ConfidenceCheck(
+                    level="EVIDENCE", rule="At least one similar incident with a recorded outcome",
+                    passed=False, detail="0 found; recommendation withheld",
+                )],
             )
 
         winner = next((s for s in summaries if s.successes > 0 and s.score > 0), None)
+        self._annotate(summaries, winner)
 
         if winner is None:
             tried = ", ".join(
@@ -90,6 +96,16 @@ class RecommendationEngine:
                     for s in summaries[:3]
                 ],
                 evidence=summaries,
+                confidence_checks=[
+                    ConfidenceCheck(
+                        level="EVIDENCE", rule="At least one similar incident with a recorded outcome",
+                        passed=True, detail=f"{len(evidence)} found",
+                    ),
+                    ConfidenceCheck(
+                        level="EVIDENCE", rule="At least one intervention has worked before",
+                        passed=False, detail="none has a recorded success; recommendation withheld",
+                    ),
+                ],
             )
 
         attempts = winner.successes + winner.partials + winner.failures
@@ -106,6 +122,8 @@ class RecommendationEngine:
             confidence = "MEDIUM"
         else:
             confidence = "LOW"
+
+        checks = self._confidence_checks(incident, winner, rate, proven_here)
 
         warnings: List[str] = []
         if winner.same_machine_failures and not winner.same_machine_successes:
@@ -152,9 +170,50 @@ class RecommendationEngine:
             supporting_incidents=winner.incident_ids.get("SUCCESS", []),
             warnings=warnings,
             evidence=summaries,
+            confidence_checks=checks,
         )
 
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _annotate(summaries: List[EvidenceSummary], winner) -> None:
+        """Explain, per intervention, why it was or wasn't recommended."""
+        for s in summaries:
+            if s is winner:
+                s.verdict = "selected"
+                s.verdict_reason = "Highest score among interventions that have worked"
+            elif s.successes == 0 and s.failures:
+                s.verdict_reason = f"Never worked: failed {s.failures} of {s.attempts} attempt(s)"
+            elif s.successes == 0:
+                s.verdict_reason = (
+                    f"No verified success ({s.partials} partial, {s.unknowns} unverified)"
+                )
+            elif s.failures > s.successes:
+                s.verdict_reason = f"Failed more often than it worked ({s.failures} vs {s.successes})"
+            elif winner is not None and s.score == winner.score:
+                s.verdict_reason = "Same score; ranked lower on successes, failures or recency"
+            elif winner is not None:
+                s.verdict_reason = f"Lower score ({s.score:g} vs {winner.score:g})"
+            else:
+                s.verdict_reason = "Score not positive"
+
+    @staticmethod
+    def _confidence_checks(incident, winner, rate, proven_here) -> List[ConfidenceCheck]:
+        pct = f"{winner.successes} of {winner.attempts} = {rate:.0%}"
+        here = f"{winner.same_machine_successes} worked, {winner.same_machine_failures} failed on {incident.machine_id}"
+        return [
+            ConfidenceCheck(level="HIGH", rule=f">= {HIGH_MIN_SUCCESSES} successes",
+                            passed=winner.successes >= HIGH_MIN_SUCCESSES, detail=f"{winner.successes} successes"),
+            ConfidenceCheck(level="HIGH", rule=f"Success rate >= {HIGH_MIN_RATE:.0%}",
+                            passed=rate >= HIGH_MIN_RATE, detail=pct),
+            ConfidenceCheck(level="HIGH", rule=(
+                f"Or: proven on this machine (>= {HIGH_SAME_MACHINE_MIN_SUCCESSES} successes here, none failed here, "
+                f"rate >= {HIGH_SAME_MACHINE_MIN_RATE:.0%})"), passed=proven_here, detail=here),
+            ConfidenceCheck(level="MEDIUM", rule=f">= {MEDIUM_MIN_SUCCESSES} successes and rate >= {MEDIUM_MIN_RATE:.0%}",
+                            passed=winner.successes >= MEDIUM_MIN_SUCCESSES and rate >= MEDIUM_MIN_RATE, detail=pct),
+            ConfidenceCheck(level="DOWNGRADE", rule="Not failed on this machine without ever working here",
+                            passed=not (winner.same_machine_failures and not winner.same_machine_successes), detail=here),
+        ]
 
     @staticmethod
     def tally(incident: Incident, evidence: List[HistoricalIncident]) -> List[EvidenceSummary]:
@@ -201,6 +260,11 @@ class RecommendationEngine:
                 same_machine_failures=g["same_f"],
                 score=round(score, 2),
                 incident_ids={k: v for k, v in g["ids"].items() if v},
+                attempts=c["SUCCESS"] + c["PARTIAL"] + c["FAILED"],
+                success_rate=(
+                    round(c["SUCCESS"] / (c["SUCCESS"] + c["PARTIAL"] + c["FAILED"]), 3)
+                    if c["SUCCESS"] + c["PARTIAL"] + c["FAILED"] else None
+                ),
             ))
 
         summaries.sort(key=lambda s: (s.score, s.successes, -s.failures), reverse=True)
