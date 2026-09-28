@@ -11,6 +11,7 @@ import type {
   MachineMemory,
   Fleet,
   HeroMachine,
+  HealthStatus,
 } from "@/types/incident";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -19,21 +20,31 @@ async function fetchAPI<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    });
+  } catch {
+    throw new Error(`Cannot reach the TRACE backend at ${API_URL}. Is it running?`);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `API error: ${response.status}`);
+    const detail = Array.isArray(error.detail)
+      ? error.detail.map((d: { loc?: string[]; msg: string }) => `${d.loc?.slice(-1)[0] ?? "field"}: ${d.msg}`).join("; ")
+      : error.detail;
+    throw new Error(detail || `API error: ${response.status}`);
   }
 
   return response.json();
 }
+
+const enc = encodeURIComponent;
 
 export const api = {
   /**
@@ -49,7 +60,7 @@ export const api = {
    * Get a specific incident by ID
    */
   getIncident: (incidentId: string): Promise<Incident> =>
-    fetchAPI<Incident>(`/incidents/${incidentId}`),
+    fetchAPI<Incident>(`/incidents/${enc(incidentId)}`),
 
   /**
    * Record the outcome of an incident
@@ -58,7 +69,7 @@ export const api = {
     incidentId: string,
     update: IncidentUpdate
   ): Promise<Incident> =>
-    fetchAPI<Incident>(`/incidents/${incidentId}/outcome`, {
+    fetchAPI<Incident>(`/incidents/${enc(incidentId)}/outcome`, {
       method: "PATCH",
       body: JSON.stringify(update),
     }),
@@ -67,7 +78,7 @@ export const api = {
    * Get machine memory/history
    */
   getMachineMemory: (machineId: string): Promise<MachineMemory> =>
-    fetchAPI<MachineMemory>(`/incidents/machine/${machineId}/memory`),
+    fetchAPI<MachineMemory>(`/incidents/machine/${enc(machineId)}/memory`),
 
   /**
    * Get dashboard statistics
@@ -89,6 +100,5 @@ export const api = {
   /**
    * Health check
    */
-  healthCheck: (): Promise<{ status: string; service: string }> =>
-    fetchAPI("/dashboard/health"),
+  healthCheck: (): Promise<HealthStatus> => fetchAPI<HealthStatus>("/dashboard/health"),
 };

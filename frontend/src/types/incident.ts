@@ -218,3 +218,13 @@ export interface HeroMachine {
     downtime_minutes?: number;
   }[];
 }
+
+export interface HealthStatus {
+  status: "healthy" | "degraded";
+  service: string;
+  checks: {
+    sqlite: { ok: boolean; incidents?: number; error?: string };
+    hindsight: { ok: boolean; bank?: string; error?: string };
+    llm: { ok: boolean; model?: string | null };
+  };
+}
