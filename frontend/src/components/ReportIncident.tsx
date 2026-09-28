@@ -112,61 +112,66 @@ export function ReportIncident({
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="glass-card rounded-3xl border border-[rgba(140,180,255,0.18)] shadow-[0_25px_60px_rgba(0,0,0,0.8)] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#101732]/90">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-amber-500" />
-            <h2 className="text-xl font-bold text-industrial-900">
-              Report Incident
-            </h2>
+            <div className="p-2 rounded-xl bg-amber-400/10 text-amber-300 border border-amber-400/30">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold text-white">
+                Report Machine Incident
+              </h2>
+              <p className="text-xs text-[#8290ab]">Query Hindsight vector memory against 567 historical factory work orders</p>
+            </div>
           </div>
           <button
             onClick={onCancel}
-            className="p-2 text-gray-400 hover:text-gray-600"
+            className="p-2 text-[#8290ab] hover:text-white rounded-xl hover:bg-white/[0.05] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+            <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-sm">
               {error}
             </div>
           )}
 
-          {/* Machine */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Machine Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Machine type *</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Machine Type *</label>
               <select
                 required
                 value={formData.machine_type}
                 onChange={(e) => selectMachineType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
               >
-                <option value="">{fleet ? "Select machine type" : "Loading..."}</option>
+                <option value="" className="bg-[#0b0e1b] text-gray-400">{fleet ? "Select machine type" : "Loading..."}</option>
                 {fleet?.machine_types.map((t) => (
-                  <option key={t.machine_type} value={t.machine_type}>
+                  <option key={t.machine_type} value={t.machine_type} className="bg-[#0b0e1b] text-white">
                     {humanize(t.label)}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Machine *</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Machine ID *</label>
               <select
                 required
                 disabled={!machineType}
                 value={formData.machine_id}
                 onChange={(e) => selectMachine(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500 disabled:bg-gray-50"
+                className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8] disabled:opacity-40"
               >
-                <option value="">Select machine</option>
+                <option value="" className="bg-[#0b0e1b] text-gray-400">Select machine</option>
                 {machineType?.machines.map((m) => (
-                  <option key={m.machine_id} value={m.machine_id}>
+                  <option key={m.machine_id} value={m.machine_id} className="bg-[#0b0e1b] text-white">
                     {m.machine_id} · {m.model} ({m.production_line})
                   </option>
                 ))}
@@ -174,18 +179,18 @@ export function ReportIncident({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Production line</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Production Line</label>
               <input
                 readOnly
                 value={formData.production_line}
                 placeholder="Set by machine"
-                className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-gray-700"
+                className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl text-sm text-[#f3f6ff] opacity-80"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Operating hours</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Operating Hours</label>
               <input
                 type="number"
                 min={0}
@@ -194,38 +199,38 @@ export function ReportIncident({
                   setFormData((prev) => ({ ...prev, operating_hours: e.target.value ? parseInt(e.target.value) : undefined }))
                 }
                 placeholder="Hour meter"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Technician ID</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Technician ID</label>
               <input
                 type="text"
                 value={formData.technician_id ?? ""}
                 onChange={(e) => setFormData((prev) => ({ ...prev, technician_id: e.target.value }))}
                 placeholder="e.g. T-117"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
               />
             </div>
           </div>
 
           {/* Problem */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-1">Problem *</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Observed Problem Mode *</label>
             <select
               required
               disabled={!machineType}
               value={defectChoice}
               onChange={(e) => selectDefect(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500 disabled:bg-gray-50"
+              className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8] disabled:opacity-40"
             >
-              <option value="">Select problem</option>
+              <option value="" className="bg-[#0b0e1b] text-gray-400">Select problem</option>
               {machineType?.defect_types.map((d) => (
-                <option key={d.defect_type} value={d.defect_type}>
+                <option key={d.defect_type} value={d.defect_type} className="bg-[#0b0e1b] text-white">
                   {humanize(d.defect_type)}
                 </option>
               ))}
-              <option value={NEW_PROBLEM}>Other / not listed...</option>
+              <option value={NEW_PROBLEM} className="bg-[#0b0e1b] text-[#38bdf8]">Other / not listed...</option>
             </select>
             {defectChoice === NEW_PROBLEM && (
               <input
@@ -237,73 +242,74 @@ export function ReportIncident({
                   setFormData((prev) => ({ ...prev, defect_type: toKey(e.target.value) }));
                 }}
                 placeholder="Short name for the problem, e.g. chip conveyor jam"
-                className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="mt-2 w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
               />
             )}
           </div>
 
           {/* Symptoms */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-2">Observed symptoms</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-2">Observed Symptoms</label>
             <div className="flex flex-wrap gap-2 mb-3">
               {[...symptomOptions, ...formData.symptoms.filter((s) => !symptomOptions.includes(s))].map((symptom) => (
                 <button
                   key={symptom}
                   type="button"
                   onClick={() => toggleSymptom(symptom)}
-                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                     formData.symptoms.includes(symptom)
-                      ? "bg-industrial-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-[#38bdf8]/20 text-[#38bdf8] border-[#38bdf8]/40 shadow-[0_0_12px_rgba(56,189,248,0.25)] font-bold"
+                      : "bg-white/[0.05] text-[#8290ab] border-white/10 hover:text-white hover:bg-white/[0.08]"
                   }`}
                 >
                   {symptom}
                 </button>
               ))}
               {symptomOptions.length === 0 && formData.symptoms.length === 0 && (
-                <span className="text-sm text-gray-400">Pick a problem to see common symptoms, or add your own.</span>
+                <span className="text-xs text-[#50607d]">Pick a problem to see historical symptoms, or add your own below.</span>
               )}
             </div>
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Add symptom"
+                placeholder="Add custom symptom..."
                 value={customSymptom}
                 onChange={(e) => setCustomSymptom(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomSymptom())}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="flex-1 px-3.5 py-2 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-xs text-white focus:outline-none focus:border-[#38bdf8]"
               />
               <button
                 type="button"
                 onClick={addCustomSymptom}
-                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-white rounded-xl border border-white/10 text-xs flex items-center gap-1"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
+                Add
               </button>
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">
               Incident Description *
             </label>
             <textarea
               required
               rows={4}
-              placeholder="What was seen, when, on which part or product, readings..."
+              placeholder="What was observed, sensor readings, error code display, when it occurred..."
               value={formData.description}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, description: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+              className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
             />
           </div>
 
           {/* Suspected Root Cause */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-1">
-              Suspected Root Cause (Optional)
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">
+              Suspected Root Cause (Optional Field Guess)
             </label>
             <input
               type="text"
@@ -315,31 +321,31 @@ export function ReportIncident({
                   suspected_root_cause: e.target.value,
                 }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+              className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
             />
           </div>
 
-          {/* Submit */}
-          <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
+          {/* Submit Action */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900"
+              className="btn-neon-outline px-5 py-2.5 text-sm font-semibold"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 bg-industrial-600 text-white rounded-lg hover:bg-industrial-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-neon-primary px-6 py-2.5 text-sm font-bold text-[#0b0e1b] flex items-center gap-2 disabled:opacity-50"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Analyzing...
+                  <Loader2 className="w-4 h-4 animate-spin text-[#0b0e1b]" />
+                  Querying Vector Memory...
                 </>
               ) : (
-                "Analyze Incident"
+                "Analyze with TRACE Memory"
               )}
             </button>
           </div>
