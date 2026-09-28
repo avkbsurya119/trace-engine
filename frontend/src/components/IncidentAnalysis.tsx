@@ -192,7 +192,21 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
             </div>
 
             <div className="mb-4">
-              <p className="text-sm text-gray-500 mb-1">Reasoning</p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm text-gray-500">Reasoning</p>
+                {recommendation.reasoning_source && (
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-0.5 rounded",
+                      recommendation.reasoning_source === "llm"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-gray-100 text-gray-600"
+                    )}
+                  >
+                    {recommendation.reasoning_source === "llm" ? "AI-phrased" : "Rule-based"}
+                  </span>
+                )}
+              </div>
               <p className="text-gray-700">{recommendation.reasoning}</p>
             </div>
 
