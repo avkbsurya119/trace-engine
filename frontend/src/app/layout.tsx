@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "TRACE | Manufacturing Defect Resolution",
   description:
     "Troubleshooting & Root-Cause Adaptive Context Engine - AI-powered manufacturing defect resolution with persistent memory",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

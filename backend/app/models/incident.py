@@ -122,6 +122,42 @@ class HistoricalIncident(BaseModel):
     recalled_facts: List[str] = Field(
         default_factory=list, description="Memory text Hindsight returned for this incident"
     )
+    # Memory decay / recency
+    recency_score: float = Field(
+        default=1.0, ge=0.0, le=1.0, description="Recency weight: 1.0=recent, 0.3=old"
+    )
+    recency_label: str = Field(
+        default="recent", description="high, medium, low based on age"
+    )
+    days_ago: int = Field(default=0, description="Days since this incident")
+
+
+class PatternAlert(BaseModel):
+    """Recurring pattern detection for a defect type."""
+
+    defect_type: str
+    total_occurrences: int
+    first_occurrence: str = Field(..., description="ISO date of first occurrence")
+    most_recent: str = Field(..., description="ISO date of most recent")
+    successful_resolutions: int = 0
+    failed_resolutions: int = 0
+    partial_resolutions: int = 0
+    machines_affected: List[str] = Field(default_factory=list)
+    is_recurring: bool = Field(default=False, description="True if 3+ occurrences")
+
+
+class CrossMachineEvidence(BaseModel):
+    """Evidence that an intervention worked across multiple machines."""
+
+    intervention_category: str
+    example_action: str
+    machines_succeeded: List[str] = Field(default_factory=list)
+    machines_failed: List[str] = Field(default_factory=list)
+    success_count: int = 0
+    total_count: int = 0
+    cross_machine_confidence: str = Field(
+        default="none", description="strong, moderate, weak, none"
+    )
 
 
 class EvidenceSummary(BaseModel):
@@ -139,6 +175,19 @@ class EvidenceSummary(BaseModel):
     incident_ids: Dict[str, List[str]] = Field(
         default_factory=dict, description="Incident IDs keyed by outcome"
     )
+    attempts: int = Field(0, description="successes + partials + failures (UNKNOWN is not an attempt)")
+    success_rate: Optional[float] = Field(None, description="successes / attempts, None when no attempts")
+    verdict: str = Field("rejected", description="'selected' for the recommended intervention, else 'rejected'")
+    verdict_reason: str = Field("", description="Deterministic one-line reason for the verdict")
+
+
+class ConfidenceCheck(BaseModel):
+    """One rule of the confidence calculation and whether it was met."""
+
+    level: str = Field(..., description="Which decision the rule belongs to: EVIDENCE, HIGH, MEDIUM or DOWNGRADE")
+    rule: str
+    passed: bool
+    detail: str = ""
 
 
 class Recommendation(BaseModel):
@@ -164,6 +213,9 @@ class Recommendation(BaseModel):
     evidence: List[EvidenceSummary] = Field(
         default_factory=list, description="Per-intervention tallies the decision was computed from"
     )
+    confidence_checks: List[ConfidenceCheck] = Field(
+        default_factory=list, description="The rules behind the confidence level, each marked met or not"
+    )
     reasoning_source: str = Field(
         default="deterministic",
         description="Who wrote the reasoning text: 'llm' or 'deterministic' (fallback)",
@@ -185,4 +237,12 @@ class AnalysisResult(BaseModel):
     memory_trace: Dict[str, Any] = Field(
         default_factory=dict,
         description="What Hindsight recall returned and how much of it passed the relevance gate",
+    )
+    # New: Pattern detection
+    pattern_alert: Optional[PatternAlert] = Field(
+        default=None, description="Alert if this is a recurring pattern"
+    )
+    # New: Cross-machine learning
+    cross_machine_evidence: List[CrossMachineEvidence] = Field(
+        default_factory=list, description="Interventions that worked across multiple machines"
     )

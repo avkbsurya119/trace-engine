@@ -93,3 +93,19 @@ export function formatHours(minutes?: number | null): string {
   if (minutes === undefined || minutes === null) return "-";
   return minutes < 60 ? `${minutes} min` : `${(minutes / 60).toFixed(1)} h`;
 }
+
+/**
+ * "2026-03" -> "Mar" or "Mar 2026"
+ */
+export function formatMonth(month: string, withYear = false): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-GB", {
+    month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
+    timeZone: "UTC",
+  });
+}
+
+export function formatPercent(value: number | null | undefined, digits = 0): string {
+  return value == null ? "-" : `${(value * 100).toFixed(digits)}%`;
+}

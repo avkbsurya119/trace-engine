@@ -56,6 +56,10 @@ export interface HistoricalIncident {
   similarity_score: number;
   relevance_factors: string[];
   recalled_facts: string[];
+  // Recency data
+  recency_score?: number;
+  recency_label?: "high" | "medium" | "low";
+  days_ago?: number;
 }
 
 export interface Intervention {
@@ -69,6 +73,32 @@ export interface Intervention {
   date: string;
   similarity: number;
   relevance: string[];
+  // Recency data
+  recency_score?: number;
+  recency_label?: "high" | "medium" | "low";
+  days_ago?: number;
+}
+
+export interface PatternAlert {
+  defect_type: string;
+  total_occurrences: number;
+  first_occurrence: string;
+  most_recent: string;
+  successful_resolutions: number;
+  failed_resolutions: number;
+  partial_resolutions: number;
+  machines_affected: string[];
+  is_recurring: boolean;
+}
+
+export interface CrossMachineEvidence {
+  intervention_category: string;
+  example_action: string;
+  machines_succeeded: string[];
+  machines_failed: string[];
+  success_count: number;
+  total_count: number;
+  cross_machine_confidence: "strong" | "moderate" | "weak" | "none";
 }
 
 export interface EvidenceSummary {
@@ -82,6 +112,17 @@ export interface EvidenceSummary {
   same_machine_failures: number;
   score: number;
   incident_ids: Partial<Record<ActionOutcome, string[]>>;
+  attempts: number;
+  success_rate: number | null;
+  verdict: "selected" | "rejected";
+  verdict_reason: string;
+}
+
+export interface ConfidenceCheck {
+  level: "EVIDENCE" | "HIGH" | "MEDIUM" | "DOWNGRADE";
+  rule: string;
+  passed: boolean;
+  detail: string;
 }
 
 export interface Recommendation {
@@ -93,6 +134,7 @@ export interface Recommendation {
   intervention_category?: string | null;
   basis: string;
   evidence: EvidenceSummary[];
+  confidence_checks: ConfidenceCheck[];
   reasoning_source?: "llm" | "deterministic";
 }
 
@@ -118,6 +160,9 @@ export interface AnalysisResult {
   recommendation: Recommendation;
   memory_contribution: string;
   memory_trace: MemoryTrace;
+  // New features
+  pattern_alert?: PatternAlert;
+  cross_machine_evidence?: CrossMachineEvidence[];
 }
 
 export interface DashboardStats {
@@ -140,6 +185,14 @@ export interface DashboardStats {
   history_start: string | null;
   history_end: string | null;
   memory_bank: string;
+  memory_growth: MemoryGrowthPoint[];
+}
+
+export interface MemoryGrowthPoint {
+  month: string;
+  incidents: number;
+  cumulative_incidents: number;
+  cumulative_outcomes: number;
 }
 
 export interface FleetMachineType {
@@ -151,8 +204,16 @@ export interface FleetMachineType {
   hero_machine_id?: string | null;
 }
 
+export interface DemoPreset {
+  key: string;
+  label: string;
+  incident: IncidentCreate;
+}
+
 export interface Fleet {
   machine_types: FleetMachineType[];
+  demo_presets: DemoPreset[];
+  demo_outcome: IncidentUpdate;
 }
 
 export interface MachineTimelineEntry {
@@ -227,4 +288,195 @@ export interface HealthStatus {
     hindsight: { ok: boolean; bank?: string; error?: string };
     llm: { ok: boolean; model?: string | null };
   };
+}
+
+// ---------------------------------------------------------------- TRACE Intelligence
+
+export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW" | "INSUFFICIENT_DATA";
+
+export interface IntelligenceOverview {
+  total_incidents: number;
+  machines: number;
+  equipment_types: number;
+  successful_repairs: number;
+  failed_repairs: number;
+  partial_repairs: number;
+  unverified_repairs: number;
+  recorded_outcomes: number;
+  memory_entries: number;
+  problems_catalogued: number;
+  problems_with_proven_fix: number;
+  knowledge_coverage: number;
+  confidence_distribution: Record<ConfidenceLevel, number>;
+  first_record: string | null;
+  knowledge_age_days: number;
+}
+
+export interface EvolutionPoint {
+  month: string;
+  incidents: number;
+  outcomes_recorded: number;
+  successful_repairs: number;
+  new_machines: number;
+  cumulative_incidents: number;
+  cumulative_outcomes: number;
+  cumulative_machines: number;
+  problems_high: number;
+  problems_medium: number;
+  problems_low: number;
+  problems_with_fix: number;
+  memory_available_rate: number;
+}
+
+export interface ImpactGroup {
+  attempts: number;
+  worked: number;
+  success_rate: number | null;
+  median_downtime_minutes: number | null;
+}
+
+export interface MemoryImpact {
+  no_memory: ImpactGroup;
+  memory_no_answer: ImpactGroup;
+  followed: ImpactGroup;
+  not_followed: ImpactGroup;
+}
+
+export interface MemoryReuse {
+  work_orders: number;
+  with_prior_memory: number;
+  with_recommendation: number;
+  with_same_machine_memory: number;
+  with_fleet_memory: number;
+  fleet_only_memory: number;
+  most_recommended_repairs: { intervention_category: string; times: number }[];
+  most_cited_work_orders: {
+    incident_id: string;
+    times: number;
+    machine_id: string;
+    defect_type: string;
+    intervention_category?: string | null;
+    timestamp: string;
+  }[];
+}
+
+export interface MachineProblemKnowledge {
+  defect_type: string;
+  occurrences: number;
+  proven_here: string[];
+  confidence: ConfidenceLevel;
+  recommended?: string | null;
+  fleet_evidence: number;
+}
+
+export interface MachineIntelligence {
+  rank: number;
+  machine_id: string;
+  machine_type: string;
+  production_line: string;
+  model?: string | null;
+  incidents: number;
+  verified_outcomes: number;
+  success_rate: number | null;
+  problems_seen: number;
+  problems_with_proven_fix_here: number;
+  memory_completeness: number;
+  downtime_hours: number;
+  problems: MachineProblemKnowledge[];
+}
+
+export interface FailurePatterns {
+  months: string[];
+  top_problems: {
+    machine_type: string;
+    defect_type: string;
+    occurrences: number;
+    machines_affected: number;
+    outcomes: Partial<Record<ActionOutcome, number>>;
+    monthly: number[] | null;
+  }[];
+  by_equipment_type: { machine_type: string; incidents: number; problems: { defect_type: string; occurrences: number }[] }[];
+  recurring: { machine_id: string; machine_type: string; defect_type: string; occurrences: number }[];
+}
+
+export interface RepairReliability {
+  machine_type: string;
+  defect_type: string;
+  intervention_category: string;
+  attempts: number;
+  successes: number;
+  partials: number;
+  failures: number;
+  unverified: number;
+  success_rate: number | null;
+  reliability: number;
+  sample: "strong" | "moderate" | "small";
+}
+
+export interface KnowledgeChange {
+  incident_id: string;
+  timestamp: string;
+  machine_id: string;
+  machine_type: string;
+  defect_type: string;
+  intervention_category?: string | null;
+  outcome: ActionOutcome;
+  confidence_before: ConfidenceLevel;
+  confidence_after: ConfidenceLevel;
+  recommended_after?: string | null;
+  evidence_after: number;
+}
+
+export interface NetworkEquipment {
+  machine_type: string;
+  label: string;
+  problems: {
+    defect_type: string;
+    occurrences: number;
+    repairs: {
+      intervention_category: string;
+      attempts: number;
+      successes: number;
+      failures: number;
+      partials: number;
+      success_rate: number | null;
+    }[];
+  }[];
+}
+
+export interface ProblemSummary {
+  machine_type: string;
+  defect_type: string;
+  evidence_count: number;
+  confidence: ConfidenceLevel;
+  recommended?: string | null;
+}
+
+export interface IntelligenceReport {
+  generated_at: string;
+  compute_ms?: number;
+  overview: IntelligenceOverview;
+  evolution: EvolutionPoint[];
+  memory_impact: MemoryImpact;
+  reuse: MemoryReuse;
+  machines: MachineIntelligence[];
+  failure_patterns: FailurePatterns;
+  reliable_repairs: {
+    min_attempts: number;
+    method: string;
+    ranked: RepairReliability[];
+    least_reliable: RepairReliability[];
+    small_sample_count: number;
+  };
+  knowledge_changes: KnowledgeChange[];
+  network: NetworkEquipment[];
+  problems: ProblemSummary[];
+}
+
+export interface ProblemKnowledge {
+  machine_type: string;
+  defect_type: string;
+  machine_id?: string | null;
+  evidence_count: number;
+  recommendation: Recommendation;
 }

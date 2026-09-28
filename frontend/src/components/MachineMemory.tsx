@@ -1,89 +1,118 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { cn, formatDay, formatHours, getOutcomeBgColor, humanize } from "@/lib/utils";
-import type { MachineMemory as MachineMemoryType, MachineTimelineEntry } from "@/types/incident";
+import type { Fleet, MachineMemory as MachineMemoryType, MachineTimelineEntry } from "@/types/incident";
 import {
-  ArrowLeft,
-  Database,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  TrendingUp,
   Activity,
-  Loader2,
+  AlertTriangle,
   BarChart3,
   Calendar,
+  CheckCircle,
+  Clock,
+  Database,
+  Plus,
+  Search,
+  XCircle,
   Zap,
 } from "lucide-react";
+import {
+  BUTTON_PRIMARY,
+  BUTTON_SECONDARY,
+  CARD,
+  CARD_INTERACTIVE,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+  Section,
+  StatTile,
+} from "@/components/ui";
 
 interface Props {
   machineId: string;
+  onSelectMachine: (machineId: string) => void;
+  onReportIncident: () => void;
   onBack: () => void;
 }
 
-export function MachineMemory({ machineId, onBack }: Props) {
+/** "What happened before?" One machine's full maintenance history, from SQLite. */
+export function MachineMemory({ machineId, onSelectMachine, onReportIncident, onBack }: Props) {
   const [memory, setMemory] = useState<MachineMemoryType | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchMemory() {
-      setLoading(true);
-      setError(null);
-      setMemory(null);
-      if (!machineId) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const data = await api.getMachineMemory(machineId);
-        setMemory(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchMemory();
+  const load = useCallback(() => {
+    if (!machineId) return;
+    setError(null);
+    setMemory(null);
+    api
+      .getMachineMemory(machineId)
+      .then(setMemory)
+      .catch((e) => setError(e instanceof Error ? e.message : "The backend did not respond."));
   }, [machineId]);
 
-  if (loading) {
+  useEffect(() => load(), [load]);
+
+  const breadcrumb = [{ label: "Machine Memory", onClick: machineId ? () => onSelectMachine("") : undefined }, ...(machineId ? [{ label: machineId }] : [])];
+
+  if (!machineId) {
     return (
-      <div className="flex flex-col items-center justify-center h-80 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-[#38bdf8]" />
-        <p className="text-xs text-gray-400 uppercase tracking-widest font-mono">Recalling Machine Vector Store...</p>
+      <div className="space-y-6">
+        <PageHeader question="What happened before?" title="Machine Memory" subtitle="Every work order on one machine: what was wrong, what was tried, and whether it worked." />
+        <MachinePicker onSelect={onSelectMachine} />
       </div>
     );
   }
+
+  const header = (
+    <PageHeader
+      question="What happened before?"
+      title={machineId}
+      breadcrumb={breadcrumb}
+      subtitle={memory && (memory.model || memory.production_line) ? [memory.model, memory.production_line].filter(Boolean).join(" · ") : undefined}
+      actions={
+        <button type="button" onClick={onBack} className={BUTTON_SECONDARY}>
+          Dashboard
+        </button>
+      }
+    />
+  );
 
   if (error) {
     return (
       <div className="space-y-6">
-        <Header machineId={machineId} onBack={onBack} />
-        <div className="glass-card border border-red-500/30 rounded-2xl p-6 text-red-300 text-sm">
-          {error}
-        </div>
+        {header}
+        <ErrorState title={`Could not load the history of ${machineId}`} detail={error} onRetry={load} />
       </div>
     );
   }
 
-  if (!machineId || !memory || memory.message || memory.total_incidents === 0) {
+  if (!memory) {
     return (
       <div className="space-y-6">
-        <Header machineId={machineId} onBack={onBack} />
-        <div className="glass-card rounded-3xl border border-white/10 p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center mx-auto mb-4 text-gray-400">
-            <Database className="w-8 h-8" />
-          </div>
-          <p className="text-gray-200 text-lg font-semibold">
-            {memory?.message || "No incident history for this machine yet."}
-          </p>
-          <p className="text-sm text-gray-400 mt-2 max-w-md mx-auto leading-relaxed">
-            Report an incident to start building this machine&apos;s memory bank and neural cross-references.
-          </p>
-        </div>
+        {header}
+        <LoadingState label={`Reading ${machineId}'s maintenance history…`} />
+      </div>
+    );
+  }
+
+  if (memory.total_incidents === 0) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <EmptyState
+          icon={<Database className="w-6 h-6" />}
+          title={`No work orders for ${machineId} yet`}
+          action={
+            <button type="button" onClick={onReportIncident} className={BUTTON_PRIMARY}>
+              <Plus className="w-4 h-4" aria-hidden /> Report an incident
+            </button>
+          }
+        >
+          When an incident on this machine is reported and its outcome recorded, it appears here, and TRACE recalls it the next time
+          the machine has a similar problem.
+        </EmptyState>
       </div>
     );
   }
@@ -92,267 +121,236 @@ export function MachineMemory({ machineId, onBack }: Props) {
 
   return (
     <div className="space-y-6">
-      <Header machineId={machineId} onBack={onBack} />
+      {header}
 
-      {/* Machine Health Summary */}
-      <div className="glass-card rounded-3xl p-6 border border-white/10 relative overflow-hidden bg-gradient-to-r from-[#38bdf8]/10 via-[#3a6cff]/10 to-transparent">
-        <div className="flex items-start gap-4">
-          <div className="p-3.5 bg-white/[0.05] border border-white/15 rounded-2xl text-[#38bdf8] shadow-inner">
-            <Database className="w-8 h-8" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h3 className="text-2xl font-black text-white tracking-wide font-mono">{machineId}</h3>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/30">
-                ACTIVE MEMORY BANK
-              </span>
-            </div>
-            {(memory.model || memory.production_line) && (
-              <p className="text-xs text-gray-400 mt-1">
-                {[memory.model, memory.production_line].filter(Boolean).join(" · ")}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-4 mt-3 text-xs">
-              <span className="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-gray-300">
-                <strong className="text-white font-mono">{memory.total_incidents}</strong> incidents
-              </span>
-              <span className="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-gray-300">
-                <strong className="text-white font-mono">{memory.recurring_defects?.length || 0}</strong> defect types
-              </span>
-              <span className="px-3 py-1.5 rounded-xl bg-[#38bdf8]/10 border border-[#38bdf8]/30 text-[#38bdf8]">
-                <strong className="font-mono">{successRate}%</strong> first-time fix rate
-              </span>
-              <span className="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 text-gray-300">
-                <strong className="text-white font-mono">{memory.total_downtime_hours ?? 0} h</strong> logged downtime
-              </span>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatTile label="Work orders" value={memory.total_incidents} sub={`${memory.recurring_defects?.length ?? 0} different problems`} icon={<Activity className="w-5 h-5" />} />
+        <StatTile label="Repairs that worked" value={memory.outcome_distribution?.SUCCESS ?? 0} sub={`${successRate}% of verified attempts`} icon={<CheckCircle className="w-5 h-5" />} tone="good" />
+        <StatTile label="Failed attempts" value={memory.outcome_distribution?.FAILED ?? 0} sub={`${memory.outcome_distribution?.PARTIAL ?? 0} partial`} icon={<XCircle className="w-5 h-5" />} tone="bad" />
+        <StatTile label="Downtime logged" value={`${memory.total_downtime_hours ?? 0} h`} sub="Across this machine's work orders" icon={<Clock className="w-5 h-5" />} tone="warn" />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          icon={<Activity className="w-5 h-5 text-[#3a6cff]" />}
-          label="Total Incidents"
-          value={memory.total_incidents || 0}
-          accent="text-white"
-        />
-        <StatCard
-          icon={<CheckCircle className="w-5 h-5 text-[#38bdf8]" />}
-          label="Repairs That Worked"
-          value={memory.outcome_distribution?.SUCCESS ?? 0}
-          accent="text-[#38bdf8]"
-        />
-        <StatCard
-          icon={<XCircle className="w-5 h-5 text-red-400 text-rose-400" />}
-          label="Failed Attempts"
-          value={memory.outcome_distribution?.FAILED ?? 0}
-          accent="text-rose-400"
-        />
-        <StatCard
-          icon={<TrendingUp className="w-5 h-5 text-amber-400" />}
-          label="Success Yield"
-          value={`${successRate}%`}
-          accent="text-amber-400"
-        />
-      </div>
+      <Section
+        icon={<Calendar className="w-5 h-5 text-industrial-600" />}
+        title="Maintenance timeline"
+        id="timeline"
+        aside={<span className="text-xs text-gray-500">Newest first · from the work-order record</span>}
+      >
+        <MemoryTimeline incidents={memory.timeline || []} />
+      </Section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recurring Defects */}
-        <div className="glass-card rounded-2xl p-6 border border-white/10">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-5 h-5 text-amber-400" />
-            <h3 className="text-base font-bold text-white uppercase tracking-wider">
-              Recurring Defects
-            </h3>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Section icon={<CheckCircle className="w-5 h-5 text-green-600" />} title="What has worked" id="worked">
+          <InterventionList interventions={memory.successful_interventions || {}} type="success" />
+        </Section>
+        <Section icon={<XCircle className="w-5 h-5 text-red-600" />} title="What hasn't worked" id="failed">
+          <InterventionList interventions={memory.failed_interventions || {}} type="failed" />
+        </Section>
+        <Section icon={<AlertTriangle className="w-5 h-5 text-amber-500" />} title="Recurring problems" id="recurring">
           {memory.recurring_defects && memory.recurring_defects.length > 0 ? (
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               {memory.recurring_defects.map(([defect, count]) => (
-                <DefectBar
-                  key={defect}
-                  defect={defect}
-                  count={count}
-                  total={memory.total_incidents || 1}
-                />
+                <DefectBar key={defect} defect={defect} count={count} total={memory.total_incidents || 1} />
               ))}
             </div>
           ) : (
-            <p className="text-gray-400 text-xs">No recurring defects recorded for this asset.</p>
+            <p className="text-gray-500 text-sm">No recurring problems.</p>
           )}
-        </div>
-
-        {/* What Worked */}
-        <div className="glass-card rounded-2xl p-6 border border-[#38bdf8]/20 bg-[#38bdf8]/[0.02]">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle className="w-5 h-5 text-[#38bdf8]" />
-            <h3 className="text-base font-bold text-white uppercase tracking-wider">
-              Verified Solutions
-            </h3>
-          </div>
-          <InterventionList
-            interventions={memory.successful_interventions || {}}
-            type="success"
-          />
-        </div>
-
-        {/* What Didn't Work */}
-        <div className="glass-card rounded-2xl p-6 border border-rose-500/20 bg-rose-500/[0.02] lg:col-span-2">
-          <div className="flex items-center gap-2 mb-4">
-            <XCircle className="w-5 h-5 text-rose-400" />
-            <h3 className="text-base font-bold text-white uppercase tracking-wider">
-              Ineffective Actions (Avoided by TRACE)
-            </h3>
-          </div>
-          <InterventionList
-            interventions={memory.failed_interventions || {}}
-            type="failed"
-          />
-        </div>
+        </Section>
       </div>
 
-      {/* Memory Timeline */}
-      <div className="glass-card rounded-2xl p-6 border border-white/10">
-        <div className="flex items-center gap-2 mb-6">
-          <Calendar className="w-5 h-5 text-[#38bdf8]" />
-          <h3 className="text-base font-bold text-white uppercase tracking-wider">Memory Timeline</h3>
-          <span className="ml-auto text-xs text-gray-400 font-mono">Newest first · Verified Work Orders</span>
-        </div>
-        <MemoryTimeline incidents={memory.timeline || []} />
-      </div>
-
-      {/* Intervention Chart */}
-      {(Object.keys(memory.successful_interventions || {}).length > 0 ||
-        Object.keys(memory.failed_interventions || {}).length > 0) && (
-        <div className="glass-card rounded-2xl p-6 border border-white/10">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-5 h-5 text-[#3a6cff]" />
-            <h3 className="text-base font-bold text-white uppercase tracking-wider">
-              Historical Interventions Comparison
-            </h3>
-          </div>
-          <InterventionChart
-            successful={memory.successful_interventions || {}}
-            failed={memory.failed_interventions || {}}
-          />
-        </div>
+      {(Object.keys(memory.successful_interventions || {}).length > 0 || Object.keys(memory.failed_interventions || {}).length > 0) && (
+        <Section icon={<BarChart3 className="w-5 h-5 text-industrial-600" />} title="Interventions on this machine" id="interventions">
+          <InterventionChart successful={memory.successful_interventions || {}} failed={memory.failed_interventions || {}} />
+        </Section>
       )}
     </div>
   );
 }
 
-function Header({ machineId, onBack }: { machineId: string; onBack: () => void }) {
-  return (
-    <div className="flex items-center gap-4">
-      <button
-        onClick={onBack}
-        className="p-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-gray-300 hover:text-white hover:bg-white/[0.08] hover:border-[#38bdf8]/40 transition-all"
-        title="Back to Dashboard"
-      >
-        <ArrowLeft className="w-5 h-5" />
-      </button>
-      <div>
-        <h2 className="text-2xl font-extrabold text-white tracking-tight">Machine Memory Dossier</h2>
-        <p className="text-xs text-[#38bdf8] font-mono mt-0.5">{machineId || "Select a machine"}</p>
-      </div>
-    </div>
-  );
-}
+/** Choose a machine: grouped by equipment type, filterable, from the fleet catalog. */
+function MachinePicker({ onSelect }: { onSelect: (machineId: string) => void }) {
+  const [fleet, setFleet] = useState<Fleet | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
-function StatCard({
-  icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number | string;
-  accent: string;
-}) {
+  const load = useCallback(() => {
+    setError(null);
+    api
+      .getFleet()
+      .then(setFleet)
+      .catch((e) => setError(e instanceof Error ? e.message : "The backend did not respond."));
+  }, []);
+  useEffect(() => load(), [load]);
+
+  const q = query.trim().toUpperCase();
+  const groups = useMemo(
+    () =>
+      (fleet?.machine_types ?? [])
+        .map((t) => ({ ...t, machines: t.machines.filter((m) => !q || m.machine_id.includes(q) || m.production_line.toUpperCase().includes(q)) }))
+        .filter((t) => t.machines.length > 0),
+    [fleet, q]
+  );
+
+  if (error) return <ErrorState title="Could not load the machine list" detail={error} onRetry={load} />;
+  if (!fleet) return <LoadingState label="Loading machines…" />;
+
   return (
-    <div className="glass-card rounded-2xl p-5 border border-white/10 hover:border-white/20 transition-all">
-      <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10">
-          {icon}
+    <div className={cn(CARD, "p-6 space-y-5")}>
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (q) onSelect(groups[0]?.machines[0]?.machine_id ?? q);
+        }}
+        className="relative max-w-sm"
+      >
+        <label htmlFor="machine-search" className="sr-only">
+          Find a machine
+        </label>
+        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+        <input
+          id="machine-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Find a machine, e.g. cnc-204"
+          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+        />
+      </form>
+      {groups.length === 0 && <p className="text-sm text-gray-500">No machine matches “{query}”.</p>}
+      {groups.map((type) => (
+        <div key={type.machine_type}>
+          <p className="text-xs uppercase tracking-wide font-semibold text-gray-500 mb-2">{humanize(type.label)}</p>
+          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {type.machines.map((m) => (
+              <li key={m.machine_id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(m.machine_id)}
+                  className={cn("w-full text-left rounded-lg border border-gray-200 px-3 py-2", CARD_INTERACTIVE)}
+                >
+                  <span className="block text-sm font-medium text-gray-900">
+                    {m.machine_id}
+                    {m.machine_id === type.hero_machine_id && <span className="ml-1 text-xs text-industrial-600">★ showcase</span>}
+                  </span>
+                  <span className="block text-xs text-gray-500 truncate">{m.production_line}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">{label}</p>
-          <p className={cn("text-2xl font-bold font-mono mt-0.5", accent)}>{value}</p>
-        </div>
-      </div>
+      ))}
     </div>
   );
 }
 
 function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
+  const [problem, setProblem] = useState<string | null>(null);
   if (incidents.length === 0) {
-    return <p className="text-gray-400 text-xs">No incidents recorded.</p>;
+    return <p className="text-gray-500 text-sm">No incidents recorded.</p>;
   }
 
+  // How each work order relates to the previous one for the same problem.
+  const chain = new Map<string, "follow-up" | "recurred">();
+  const lastByProblem = new Map<string, MachineTimelineEntry>();
+  for (const entry of [...incidents].reverse()) {
+    const previous = lastByProblem.get(entry.defect_type);
+    if (previous) chain.set(entry.incident_id, previous.action_outcome === "SUCCESS" ? "recurred" : "follow-up");
+    lastByProblem.set(entry.defect_type, entry);
+  }
+  const counts = incidents.reduce<Record<string, number>>((acc, i) => ((acc[i.defect_type] = (acc[i.defect_type] ?? 0) + 1), acc), {});
+  const shown = problem ? incidents.filter((i) => i.defect_type === problem) : incidents;
+
   return (
+    <div>
+      <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filter timeline by problem">
+        {[null, ...Object.keys(counts)].map((key) => (
+          <button
+            key={key ?? "all"}
+            type="button"
+            aria-pressed={problem === key}
+            onClick={() => setProblem(key)}
+            className={cn(
+              "text-xs px-2.5 py-1 rounded-full border transition-colors",
+              problem === key ? "bg-industrial-600 text-white border-industrial-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"
+            )}
+          >
+            {key ? `${humanize(key)} (${counts[key]})` : `All (${incidents.length})`}
+          </button>
+        ))}
+      </div>
     <div className="relative">
-      <div className="absolute left-3.5 top-2 bottom-2 w-0.5 bg-white/10" />
-      <div className="space-y-4">
-        {incidents.map((incident, i) => (
-          <div key={incident.incident_id} className="relative pl-9">
+      <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" aria-hidden />
+      <ol className="space-y-3">
+        {shown.map((incident, i) => (
+          <li
+            key={incident.incident_id}
+            className="relative pl-8 animate-fade-in"
+            style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
+          >
             <div
               className={cn(
-                "absolute left-1 top-2.5 w-5 h-5 rounded-full flex items-center justify-center border",
+                "absolute left-0 top-1 w-6 h-6 rounded-full flex items-center justify-center",
                 incident.action_outcome === "SUCCESS"
-                  ? "bg-[#38bdf8]/20 border-[#38bdf8] text-[#38bdf8]"
+                  ? "bg-green-100"
                   : incident.action_outcome === "FAILED"
-                  ? "bg-rose-500/20 border-rose-500 text-rose-400"
+                  ? "bg-red-100"
                   : incident.action_outcome === "PARTIAL"
-                  ? "bg-amber-400/20 border-amber-400 text-amber-400"
-                  : "bg-white/10 border-white/20 text-gray-400"
+                  ? "bg-amber-100"
+                  : "bg-gray-100"
               )}
             >
               {incident.action_outcome === "SUCCESS" ? (
-                <CheckCircle className="w-3.5 h-3.5" />
+                <CheckCircle className="w-4 h-4 text-green-600" />
               ) : incident.action_outcome === "FAILED" ? (
-                <XCircle className="w-3.5 h-3.5" />
+                <XCircle className="w-4 h-4 text-red-600" />
               ) : (
-                <AlertTriangle className="w-3.5 h-3.5" />
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
               )}
             </div>
-            <div className="glass-card rounded-2xl p-4 border border-white/10 hover:border-white/20 transition-all">
-              <div className="flex items-center justify-between mb-1.5 gap-2">
-                <p className="text-sm font-bold text-white flex items-center gap-2">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1 gap-2">
+                <p className="text-sm font-medium text-gray-900">
                   {humanize(incident.defect_type)}
-                  {i === 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/30">
-                      <Zap className="w-3 h-3" />
-                      LATEST
+                  {i === 0 && !problem && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-xs text-industrial-600">
+                      <Zap className="w-3 h-3" aria-hidden />
+                      Most recent
                     </span>
                   )}
+                  {chain.get(incident.incident_id) === "follow-up" && (
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Follow-up: previous attempt didn&apos;t work</span>
+                  )}
+                  {chain.get(incident.incident_id) === "recurred" && (
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Came back after a fix</span>
+                  )}
                 </p>
-                <span className={cn("text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full flex-shrink-0 uppercase tracking-wider", getOutcomeBgColor(incident.action_outcome))}>
+                <span className={cn("text-xs px-2 py-0.5 rounded flex-shrink-0", getOutcomeBgColor(incident.action_outcome))}>
                   {incident.action_outcome ?? "OPEN"}
                 </span>
               </div>
-              <p className="text-xs text-gray-400 font-mono">
-                {formatDay(incident.timestamp)} · <span className="text-gray-300 font-semibold">{incident.incident_id}</span>
-                {incident.technician_id ? ` · Tech: ${incident.technician_id}` : ""}
+              <p className="text-xs text-gray-500">
+                {formatDay(incident.timestamp)} · {incident.incident_id}
+                {incident.technician_id ? ` · ${incident.technician_id}` : ""}
                 {incident.operating_hours ? ` · ${incident.operating_hours.toLocaleString()} h` : ""}
-                {incident.downtime_minutes ? ` · Downtime ${formatHours(incident.downtime_minutes)}` : ""}
+                {incident.downtime_minutes ? ` · downtime ${formatHours(incident.downtime_minutes)}` : ""}
               </p>
               {incident.action_taken ? (
-                <p className="text-xs text-gray-200 mt-2 bg-white/[0.02] p-2 rounded-xl border border-white/5">
-                  {incident.intervention_category && <span className="font-semibold text-[#38bdf8]">{incident.intervention_category}: </span>}
+                <p className="text-sm text-gray-700 mt-1">
+                  {incident.intervention_category && <span className="font-medium">{incident.intervention_category}: </span>}
                   {incident.action_taken}
                 </p>
               ) : (
-                <p className="text-xs text-gray-500 mt-2 italic">No outcome recorded yet.</p>
+                <p className="text-sm text-gray-500 mt-1">No outcome recorded yet.</p>
               )}
               {incident.technician_notes && (
-                <p className="text-xs text-gray-400 mt-1.5 italic">&ldquo;{incident.technician_notes}&rdquo;</p>
+                <p className="text-xs text-gray-500 mt-1">&ldquo;{incident.technician_notes}&rdquo;</p>
               )}
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
+    </div>
     </div>
   );
 }
@@ -369,15 +367,19 @@ function DefectBar({
   const percentage = Math.round((count / total) * 100);
   return (
     <div>
-      <div className="flex justify-between text-xs mb-1.5 font-medium">
-        <span className="text-gray-200">{humanize(defect)}</span>
-        <span className="text-gray-400 font-mono">{count} incidents ({percentage}%)</span>
+      <div className="flex justify-between mb-1">
+        <span className="text-sm font-medium text-gray-700">{humanize(defect)}</span>
+        <span className="text-sm text-gray-500">{count} incidents</span>
       </div>
-      <div className="w-full bg-white/[0.06] rounded-full h-3 overflow-hidden border border-white/5">
+      <div className="w-full bg-gray-200 rounded-full h-4">
         <div
-          className="bg-amber-400 h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(251,191,36,0.5)]"
-          style={{ width: `${Math.max(percentage, 8)}%` }}
-        />
+          className="bg-amber-500 h-4 rounded-full flex items-center justify-end pr-2"
+          style={{ width: `${Math.max(percentage, 10)}%` }}
+        >
+          {percentage >= 20 && (
+            <span className="text-xs text-white font-medium">{percentage}%</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -393,33 +395,36 @@ function InterventionList({
   const entries = Object.entries(interventions);
   if (entries.length === 0) {
     return (
-      <p className="text-gray-400 text-xs">
+      <p className="text-gray-500 text-sm">
         No {type === "success" ? "successful" : "failed"} interventions recorded.
       </p>
     );
   }
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-3">
       {entries.map(([action, defects]) => (
         <div
           key={action}
           className={cn(
-            "p-3.5 rounded-xl border transition-all",
-            type === "success"
-              ? "bg-[#38bdf8]/[0.08] border-[#38bdf8]/30 text-gray-200"
-              : "bg-rose-500/[0.08] border-rose-500/30 text-gray-200"
+            "p-3 rounded-lg",
+            type === "success" ? "bg-green-50" : "bg-red-50"
           )}
         >
           <p
             className={cn(
-              "font-semibold text-sm",
-              type === "success" ? "text-[#38bdf8]" : "text-rose-400"
+              "font-medium",
+              type === "success" ? "text-green-800" : "text-red-800"
             )}
           >
             {action}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {type === "success" ? "Resolved" : "Failed for"}: <span className="text-gray-200">{countList(defects)}</span>
+          <p
+            className={cn(
+              "text-sm mt-1",
+              type === "success" ? "text-green-600" : "text-red-600"
+            )}
+          >
+            {type === "success" ? "Resolved" : "Failed for"}: {countList(defects)}
           </p>
         </div>
       ))}
@@ -448,32 +453,32 @@ function InterventionChart({
     <div className="space-y-4">
       {data.slice(0, 5).map((item) => (
         <div key={item.action}>
-          <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-gray-200 font-medium truncate pr-4">{item.action}</span>
-            <span className="text-gray-400 font-mono flex-shrink-0">
-              <span className="text-[#38bdf8]">{item.success} success</span> · <span className="text-rose-400">{item.failed} failed</span>
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-gray-700 truncate pr-4">{item.action}</span>
+            <span className="text-gray-500 flex-shrink-0">
+              {item.success} success · {item.failed} failed
             </span>
           </div>
-          <div className="flex h-3 bg-white/[0.06] rounded-full overflow-hidden border border-white/5">
+          <div className="flex h-6 bg-gray-100 rounded overflow-hidden">
             <div
-              className="bg-[#38bdf8] shadow-[0_0_10px_rgba(56,189,248,0.5)] transition-all duration-700"
+              className="bg-green-500"
               style={{ width: `${(item.success / maxTotal) * 100}%` }}
             />
             <div
-              className="bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)] transition-all duration-700"
+              className="bg-red-500"
               style={{ width: `${(item.failed / maxTotal) * 100}%` }}
             />
           </div>
         </div>
       ))}
-      <div className="flex justify-center gap-6 pt-4 border-t border-white/10">
+      <div className="flex justify-center gap-6 pt-4 border-t">
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 bg-[#38bdf8] rounded-full shadow-[0_0_6px_#38bdf8]" />
-          <span className="text-xs text-gray-300 font-medium">Worked</span>
+          <div className="w-3 h-3 bg-green-500 rounded" />
+          <span className="text-sm text-gray-600">Success</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 bg-rose-500 rounded-full shadow-[0_0_6px_#f43f5e]" />
-          <span className="text-xs text-gray-300 font-medium">Failed</span>
+          <div className="w-3 h-3 bg-red-500 rounded" />
+          <span className="text-sm text-gray-600">Failed</span>
         </div>
       </div>
     </div>

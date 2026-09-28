@@ -151,3 +151,65 @@ async def test_cors_allows_frontend_origins(client):
     for origin in ("http://localhost:3000", "http://127.0.0.1:3000"):
         r = await client.options("/api/dashboard/stats", headers={"Origin": origin, "Access-Control-Request-Method": "GET"})
         assert r.headers.get("access-control-allow-origin") == origin
+
+
+async def test_memory_errors_are_readable_and_reported_by_health(client, db, fake_hindsight, monkeypatch):
+    from app.hindsight import memory as memory_module
+
+    class CreditsError(Exception):
+        status = 402
+        body = '{"detail":"Insufficient credits. Please add credits to continue."}'
+
+        def __str__(self):
+            return "(402)\nReason: Payment Required\nHTTP response headers: <...lots of headers...>"
+
+    async def refuse(*args, **kwargs):
+        raise CreditsError()
+
+    monkeypatch.setattr(fake_hindsight, "recall", refuse)
+    try:
+        response = await client.post("/api/incidents/analyze", json=AC407)
+        detail = response.json()["detail"]
+        assert response.status_code == 503
+        assert "Hindsight 402: Insufficient credits" in detail and "headers" not in detail
+
+        health = (await client.get("/api/dashboard/health")).json()
+        assert health["status"] == "degraded"
+        assert "Insufficient credits" in health["checks"]["hindsight"]["error"]
+    finally:
+        memory_module.MEMORY_STATUS.update(last_error=None, at=0.0)
+
+
+async def test_stats_include_monotonic_memory_growth(client, seeded):
+    stats = (await client.get("/api/dashboard/stats")).json()
+    growth = stats["memory_growth"]
+    assert [g["month"] for g in growth] == sorted(g["month"] for g in growth)
+    cumulative = [g["cumulative_outcomes"] for g in growth]
+    assert cumulative == sorted(cumulative) and cumulative[-1] == stats["incidents_with_outcome"]
+    assert growth[-1]["cumulative_incidents"] == stats["total_incidents"]
+
+
+async def test_demo_presets_are_valid_and_shared_with_script(client, db):
+    from scripts import demo
+
+    fleet = (await client.get("/api/dashboard/fleet")).json()
+    presets = fleet["demo_presets"]
+    types = {t["machine_type"]: t for t in fleet["machine_types"]}
+    for preset in presets:
+        inc = preset["incident"]
+        t = types[inc["machine_type"]]
+        assert inc["machine_id"] in {m["machine_id"] for m in t["machines"]}
+        assert inc["defect_type"] in {d["defect_type"] for d in t["defect_types"]}
+    assert demo.INCIDENT_1 == presets[0]["incident"] and demo.INCIDENT_2 == presets[1]["incident"]
+    assert demo.OUTCOME_1 == fleet["demo_outcome"]
+
+
+async def test_demo_first_preset_withholds_then_learns(client, seeded):
+    fleet = (await client.get("/api/dashboard/fleet")).json()
+    first, second = fleet["demo_presets"][:2]
+    r1 = (await client.post("/api/incidents/analyze", json=first["incident"])).json()
+    assert r1["recommendation"]["confidence_checks"][0]["passed"] is False
+    await client.patch(f"/api/incidents/{r1['current_incident']['incident_id']}/outcome", json=fleet["demo_outcome"])
+    r2 = (await client.post("/api/incidents/analyze", json=second["incident"])).json()
+    assert r2["recommendation"]["intervention_category"] == fleet["demo_outcome"]["intervention_category"]
+    assert r2["recommendation"]["evidence"][0]["verdict"] == "selected"

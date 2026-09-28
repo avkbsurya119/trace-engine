@@ -4,39 +4,48 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { humanize } from "@/lib/utils";
 import type { IncidentCreate, AnalysisResult, Fleet } from "@/types/incident";
-import { AlertTriangle, X, Plus, Loader2 } from "lucide-react";
+import { AnalysisProgress } from "@/components/analysis/AnalysisProgress";
+import { Plus, Loader2, Search } from "lucide-react";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, CARD, ErrorState, PageHeader } from "@/components/ui";
+import { usePresentation } from "@/components/JudgeMode";
 
 interface ReportIncidentProps {
   onAnalysisComplete: (result: AnalysisResult) => void;
   onCancel: () => void;
+  /** Pre-filled incident (Judge mode or demo preset). */
+  preset?: IncidentCreate | null;
 }
+
+const EMPTY_INCIDENT: IncidentCreate = {
+  machine_id: "",
+  machine_type: "",
+  production_line: "",
+  defect_type: "",
+  symptoms: [],
+  sensor_values: {},
+  operating_conditions: {},
+  description: "",
+  suspected_root_cause: "",
+  operating_hours: undefined,
+  technician_id: "",
+};
 
 const NEW_PROBLEM = "__new__";
 
 export function ReportIncident({
   onAnalysisComplete,
   onCancel,
+  preset,
 }: ReportIncidentProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<IncidentCreate>({
-    machine_id: "",
-    machine_type: "",
-    production_line: "",
-    defect_type: "",
-    symptoms: [],
-    sensor_values: {},
-    operating_conditions: {},
-    description: "",
-    suspected_root_cause: "",
-    operating_hours: undefined,
-    technician_id: "",
-  });
+  const [formData, setFormData] = useState<IncidentCreate>({ ...EMPTY_INCIDENT, ...(preset ?? {}) });
 
   const [customSymptom, setCustomSymptom] = useState("");
+  const presenting = usePresentation();
   const [fleet, setFleet] = useState<Fleet | null>(null);
-  const [defectChoice, setDefectChoice] = useState("");
+  const [defectChoice, setDefectChoice] = useState(preset?.defect_type ?? "");
   const [newDefect, setNewDefect] = useState("");
 
   useEffect(() => {
@@ -54,6 +63,15 @@ export function ReportIncident({
     () => machineType?.defect_types.find((d) => d.defect_type === defectChoice)?.symptoms ?? [],
     [machineType, defectChoice]
   );
+
+  const loadPreset = (key: string) => {
+    const found = fleet?.demo_presets.find((p) => p.key === key);
+    if (!found) return;
+    setFormData({ ...EMPTY_INCIDENT, ...found.incident });
+    setDefectChoice(found.incident.defect_type);
+    setNewDefect("");
+    setError(null);
+  };
 
   const selectMachineType = (value: string) => {
     setFormData((prev) => ({ ...prev, machine_type: value, machine_id: "", production_line: "", defect_type: "", symptoms: [] }));
@@ -111,67 +129,72 @@ export function ReportIncident({
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="glass-card rounded-3xl border border-[rgba(140,180,255,0.18)] shadow-[0_25px_60px_rgba(0,0,0,0.8)] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-[#101732]/90">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-amber-400/10 text-amber-300 border border-amber-400/30">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-extrabold text-white">
-                Report Machine Incident
-              </h2>
-              <p className="text-xs text-[#8290ab]">Query Hindsight vector memory against 567 historical factory work orders</p>
-            </div>
-          </div>
-          <button
-            onClick={onCancel}
-            className="p-2 text-[#8290ab] hover:text-white rounded-xl hover:bg-white/[0.05] transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <div className="max-w-3xl mx-auto space-y-6">
+      <PageHeader
+        question="What happened?"
+        title="Report incident"
+        breadcrumb={[{ label: "Dashboard", onClick: onCancel }, { label: "Report incident" }]}
+        subtitle="Describe the problem as the operator saw it. TRACE searches memory for similar work orders as soon as you analyze."
+      />
+      <div className={CARD}>
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6">
-          {error && (
-            <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-sm">
-              {error}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {error && <ErrorState title="The incident could not be analyzed" detail={error} />}
+
+          {fleet && fleet.demo_presets.length > 0 && !presenting && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-industrial-50 border border-industrial-100 px-3 py-2">
+              <label htmlFor="demo-preset" className="text-sm text-industrial-800 font-medium">
+                Load a demo incident
+              </label>
+              <select
+                id="demo-preset"
+                defaultValue=""
+                onChange={(e) => {
+                  loadPreset(e.target.value);
+                  e.target.value = "";
+                }}
+                className="flex-1 min-w-[14rem] px-2 py-1.5 border border-industrial-200 rounded-md text-sm bg-white"
+              >
+                <option value="">Choose…</option>
+                {fleet.demo_presets.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
-          {/* Machine Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Machine */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Machine Type *</label>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Machine type *</label>
               <select
                 required
                 value={formData.machine_type}
                 onChange={(e) => selectMachineType(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
               >
-                <option value="" className="bg-[#0b0e1b] text-gray-400">{fleet ? "Select machine type" : "Loading..."}</option>
+                <option value="">{fleet ? "Select machine type" : "Loading..."}</option>
                 {fleet?.machine_types.map((t) => (
-                  <option key={t.machine_type} value={t.machine_type} className="bg-[#0b0e1b] text-white">
+                  <option key={t.machine_type} value={t.machine_type}>
                     {humanize(t.label)}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Machine ID *</label>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Machine *</label>
               <select
                 required
                 disabled={!machineType}
                 value={formData.machine_id}
                 onChange={(e) => selectMachine(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8] disabled:opacity-40"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500 disabled:bg-gray-50"
               >
-                <option value="" className="bg-[#0b0e1b] text-gray-400">Select machine</option>
+                <option value="">Select machine</option>
                 {machineType?.machines.map((m) => (
-                  <option key={m.machine_id} value={m.machine_id} className="bg-[#0b0e1b] text-white">
+                  <option key={m.machine_id} value={m.machine_id}>
                     {m.machine_id} · {m.model} ({m.production_line})
                   </option>
                 ))}
@@ -179,18 +202,18 @@ export function ReportIncident({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Production Line</label>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Production line</label>
               <input
                 readOnly
                 value={formData.production_line}
                 placeholder="Set by machine"
-                className="w-full px-3.5 py-2.5 bg-white/[0.04] border border-white/10 rounded-xl text-sm text-[#f3f6ff] opacity-80"
+                className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-gray-700"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Operating Hours</label>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Operating hours</label>
               <input
                 type="number"
                 min={0}
@@ -199,38 +222,38 @@ export function ReportIncident({
                   setFormData((prev) => ({ ...prev, operating_hours: e.target.value ? parseInt(e.target.value) : undefined }))
                 }
                 placeholder="Hour meter"
-                className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Technician ID</label>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Technician ID</label>
               <input
                 type="text"
                 value={formData.technician_id ?? ""}
                 onChange={(e) => setFormData((prev) => ({ ...prev, technician_id: e.target.value }))}
                 placeholder="e.g. T-117"
-                className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
               />
             </div>
           </div>
 
           {/* Problem */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">Observed Problem Mode *</label>
+            <label className="block text-sm font-medium text-industrial-700 mb-1">Problem *</label>
             <select
               required
               disabled={!machineType}
               value={defectChoice}
               onChange={(e) => selectDefect(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8] disabled:opacity-40"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500 disabled:bg-gray-50"
             >
-              <option value="" className="bg-[#0b0e1b] text-gray-400">Select problem</option>
+              <option value="">Select problem</option>
               {machineType?.defect_types.map((d) => (
-                <option key={d.defect_type} value={d.defect_type} className="bg-[#0b0e1b] text-white">
+                <option key={d.defect_type} value={d.defect_type}>
                   {humanize(d.defect_type)}
                 </option>
               ))}
-              <option value={NEW_PROBLEM} className="bg-[#0b0e1b] text-[#38bdf8]">Other / not listed...</option>
+              <option value={NEW_PROBLEM}>Other / not listed...</option>
             </select>
             {defectChoice === NEW_PROBLEM && (
               <input
@@ -242,74 +265,73 @@ export function ReportIncident({
                   setFormData((prev) => ({ ...prev, defect_type: toKey(e.target.value) }));
                 }}
                 placeholder="Short name for the problem, e.g. chip conveyor jam"
-                className="mt-2 w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
+                className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
               />
             )}
           </div>
 
           {/* Symptoms */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-2">Observed Symptoms</label>
+            <label className="block text-sm font-medium text-industrial-700 mb-2">Observed symptoms</label>
             <div className="flex flex-wrap gap-2 mb-3">
               {[...symptomOptions, ...formData.symptoms.filter((s) => !symptomOptions.includes(s))].map((symptom) => (
                 <button
                   key={symptom}
                   type="button"
                   onClick={() => toggleSymptom(symptom)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
                     formData.symptoms.includes(symptom)
-                      ? "bg-[#38bdf8]/20 text-[#38bdf8] border-[#38bdf8]/40 shadow-[0_0_12px_rgba(56,189,248,0.25)] font-bold"
-                      : "bg-white/[0.05] text-[#8290ab] border-white/10 hover:text-white hover:bg-white/[0.08]"
+                      ? "bg-industrial-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   {symptom}
                 </button>
               ))}
               {symptomOptions.length === 0 && formData.symptoms.length === 0 && (
-                <span className="text-xs text-[#50607d]">Pick a problem to see historical symptoms, or add your own below.</span>
+                <span className="text-sm text-gray-400">Pick a problem to see common symptoms, or add your own.</span>
               )}
             </div>
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Add custom symptom..."
+                placeholder="Add symptom"
                 value={customSymptom}
                 onChange={(e) => setCustomSymptom(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomSymptom())}
-                className="flex-1 px-3.5 py-2 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-xs text-white focus:outline-none focus:border-[#38bdf8]"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
               />
               <button
                 type="button"
                 onClick={addCustomSymptom}
-                className="px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-white rounded-xl border border-white/10 text-xs flex items-center gap-1"
+                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
               >
-                <Plus className="w-4 h-4" />
-                Add
+                <Plus className="w-5 h-5" />
               </button>
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">
+            <label className="block text-sm font-medium text-industrial-700 mb-1">
               Incident Description *
             </label>
             <textarea
               required
               rows={4}
-              placeholder="What was observed, sensor readings, error code display, when it occurred..."
+              placeholder="What was seen, when, on which part or product, readings..."
               value={formData.description}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, description: e.target.value }))
               }
-              className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
             />
           </div>
 
           {/* Suspected Root Cause */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[#8290ab] mb-1.5">
-              Suspected Root Cause (Optional Field Guess)
+            <label className="block text-sm font-medium text-industrial-700 mb-1">
+              Suspected Root Cause (Optional)
             </label>
             <input
               type="text"
@@ -321,32 +343,20 @@ export function ReportIncident({
                   suspected_root_cause: e.target.value,
                 }))
               }
-              className="w-full px-3.5 py-2.5 bg-[#141c38]/90 border border-[rgba(140,180,255,0.18)] rounded-xl text-sm text-white focus:outline-none focus:border-[#38bdf8]"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
             />
           </div>
 
-          {/* Submit Action */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="btn-neon-outline px-5 py-2.5 text-sm font-semibold"
-            >
+          {loading && <AnalysisProgress machineId={formData.machine_id} machineType={formData.machine_type} />}
+
+          {/* Submit */}
+          <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
+            <button type="button" onClick={onCancel} className={BUTTON_SECONDARY}>
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-neon-primary px-6 py-2.5 text-sm font-bold text-[#0b0e1b] flex items-center gap-2 disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[#0b0e1b]" />
-                  Querying Vector Memory...
-                </>
-              ) : (
-                "Analyze with TRACE Memory"
-              )}
+            <button type="submit" disabled={loading} className={BUTTON_PRIMARY}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Search className="w-4 h-4" aria-hidden />}
+              {loading ? "Consulting memory…" : "Analyze incident"}
             </button>
           </div>
         </form>
