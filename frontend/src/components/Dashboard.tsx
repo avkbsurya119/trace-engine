@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
-import type { DashboardStats } from "@/types/incident";
+import { cn, formatDay, humanize } from "@/lib/utils";
+import type { DashboardStats, Fleet } from "@/types/incident";
 import {
   AlertTriangle,
   CheckCircle,
@@ -18,6 +18,7 @@ import {
   ArrowRight,
   BarChart3,
   Loader2,
+  Clock,
 } from "lucide-react";
 
 interface DashboardProps {
@@ -34,6 +35,11 @@ export function Dashboard({
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fleet, setFleet] = useState<Fleet | null>(null);
+
+  useEffect(() => {
+    api.getFleet().then(setFleet).catch(() => setFleet(null));
+  }, []);
 
   useEffect(() => {
     async function fetchStats() {
@@ -92,6 +98,12 @@ export function Dashboard({
           <p className="text-industrial-600">
             Organizational memory for manufacturing troubleshooting
           </p>
+          {stats?.history_start && stats?.history_end && (
+            <p className="text-xs text-gray-500 mt-1">
+              Synthetic, operationally realistic work-order history · {formatDay(stats.history_start)} –{" "}
+              {formatDay(stats.history_end)} · Hindsight bank {stats.memory_bank}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {onShowBeforeAfter && (
@@ -137,17 +149,17 @@ export function Dashboard({
               color="industrial"
             />
             <MetricCard
-              icon={<Brain className="w-6 h-6" />}
-              label="Memory Depth"
-              value={`${memoryDepth}%`}
-              sublabel={`${stats.incidents_with_outcome} with outcomes`}
+              icon={<Clock className="w-6 h-6" />}
+              label="Downtime Logged"
+              value={`${Math.round(stats.total_downtime_hours).toLocaleString()} h`}
+              sublabel={`${memoryDepth}% of incidents have an outcome`}
               color="blue"
             />
             <MetricCard
               icon={<Target className="w-6 h-6" />}
-              label="Success Rate"
+              label="Repairs That Worked"
               value={`${successRate}%`}
-              sublabel="First-time fix rate"
+              sublabel="SUCCESS share of recorded outcomes"
               color="green"
             />
             <MetricCard
@@ -193,7 +205,7 @@ export function Dashboard({
                     color="red"
                   />
                   <OutcomeRow
-                    label="Pending"
+                    label="Not verified"
                     count={stats.outcome_distribution.UNKNOWN}
                     total={stats.incidents_with_outcome}
                     icon={<Activity className="w-4 h-4" />}
@@ -210,7 +222,7 @@ export function Dashboard({
               <div className="flex items-center gap-2 mb-4">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
                 <h3 className="text-lg font-semibold text-industrial-900">
-                  Defect Type Distribution
+                  Most Frequent Problems
                 </h3>
               </div>
               {Object.keys(stats.defect_type_distribution).length > 0 ? (
@@ -243,11 +255,12 @@ export function Dashboard({
                 </h3>
               </div>
               <span className="text-sm text-industrial-600">
-                {stats.unique_machines} machines tracked
+                {stats.unique_machines} machines with history · click a type to open its hero machine
               </span>
             </div>
             <MachineTypeBreakdown
-              defectDistribution={stats.defect_type_distribution}
+              distribution={stats.machine_type_distribution ?? {}}
+              fleet={fleet}
               onViewMachine={onViewMachineMemory}
             />
           </div>
@@ -507,61 +520,41 @@ function DefectRow({
 }
 
 function MachineTypeBreakdown({
-  defectDistribution,
+  distribution,
+  fleet,
   onViewMachine,
 }: {
-  defectDistribution: { [key: string]: number };
+  distribution: { [machineType: string]: number };
+  fleet: Fleet | null;
   onViewMachine: (machineId: string) => void;
 }) {
-  // Group defects by likely machine type based on naming patterns
-  const machineTypes = [
-    {
-      type: "CNC",
-      id: "CNC-01",
-      defects: ["surface_roughness", "tool_wear", "dimensional_error"],
-      icon: <Server className="w-5 h-5" />,
-    },
-    {
-      type: "Injection Molding",
-      id: "INJ-01",
-      defects: ["short_shot", "flash_defect", "sink_marks"],
-      icon: <Server className="w-5 h-5" />,
-    },
-    {
-      type: "Hydraulic Press",
-      id: "HYD-01",
-      defects: ["pressure_loss", "seal_failure"],
-      icon: <Server className="w-5 h-5" />,
-    },
-    {
-      type: "Robotic Welder",
-      id: "WLD-01",
-      defects: ["weld_spatter", "arc_deviation"],
-      icon: <Server className="w-5 h-5" />,
-    },
-  ];
+  const types = fleet?.machine_types ?? [];
+  if (types.length === 0) {
+    return <EmptyState message="Loading fleet..." />;
+  }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {machineTypes.map((machine) => {
-        const incidentCount = machine.defects.reduce(
-          (sum, defect) => sum + (defectDistribution[defect] || 0),
-          0
-        );
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {types.map((type) => {
+        const incidentCount = distribution[type.machine_type] ?? 0;
+        const target = type.hero_machine_id ?? type.machines[0]?.machine_id;
         return (
           <button
-            key={machine.type}
-            onClick={() => onViewMachine(machine.id)}
+            key={type.machine_type}
+            onClick={() => target && onViewMachine(target)}
             className="bg-gray-50 hover:bg-gray-100 rounded-lg p-4 text-left transition-colors group"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-blue-500">{machine.icon}</span>
+              <span className="text-blue-500">
+                <Server className="w-5 h-5" />
+              </span>
               <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <p className="font-medium text-gray-900">{machine.type}</p>
+            <p className="font-medium text-gray-900">{humanize(type.label)}</p>
             <p className="text-sm text-gray-500">
-              {incidentCount} incident{incidentCount !== 1 ? "s" : ""}
+              {incidentCount} incident{incidentCount !== 1 ? "s" : ""} · {type.machines.length} machines
             </p>
+            {target && <p className="text-xs text-industrial-600 mt-1">Open {target}</p>}
           </button>
         );
       })}
@@ -578,7 +571,7 @@ function MemoryValueCard({
   successRate: number;
   onReportIncident: () => void;
 }) {
-  if (incidents >= 10 && successRate >= 50) {
+  if (incidents >= 10) {
     // Memory is valuable
     return (
       <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-6 text-white">

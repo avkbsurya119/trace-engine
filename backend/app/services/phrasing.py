@@ -28,13 +28,21 @@ SYSTEM_PROMPT = (
     "assume anything that is not listed: no new causes, actions, numbers, "
     "incident IDs, or safety advice. Do not change the recommended action or "
     "the confidence level. Cite supporting incidents by their exact IDs and "
-    "state clearly what worked and what failed. If there is no history, say "
-    "so plainly. Write 2-4 plain sentences, no markdown, no bullet points."
+    "state clearly what worked and what failed. If there is no evidence-backed "
+    "recommendation, say so plainly and do not suggest any action. Write 2-4 "
+    "plain sentences, no markdown, no bullet points."
 )
 
+CONFIDENCE_WORDS = {
+    "HIGH": "high",
+    "MEDIUM": "medium",
+    "LOW": "low",
+    "INSUFFICIENT_DATA": "insufficient evidence (no recommendation)",
+}
+
 # Matches the incident ID formats used by seed data and live reports,
-# e.g. TRC-CNC-001, INC-20260928-1A2B3C4D.
-INCIDENT_ID_PATTERN = re.compile(r"\b(?:TRC|INC)-[A-Z0-9-]+\b")
+# e.g. WO-2026-05431 (history), INC-20260928-1A2B3C (live reports).
+INCIDENT_ID_PATTERN = re.compile(r"\b(?:WO|INC|TRC)-[A-Z0-9-]+\b")
 
 
 class ReasoningPhraser:
@@ -59,9 +67,7 @@ class ReasoningPhraser:
         self,
         incident: Incident,
         recommendation: Recommendation,
-        historical: List[HistoricalIncident],
-        successful: List[Dict[str, Any]],
-        failed: List[Dict[str, Any]],
+        evidence: List[HistoricalIncident],
     ) -> Recommendation:
         """
         Return the recommendation with LLM-phrased reasoning, or the
@@ -71,9 +77,7 @@ class ReasoningPhraser:
         if self._client is None:
             return recommendation
 
-        facts = self._build_facts(
-            incident, recommendation, historical, successful, failed
-        )
+        facts = self._build_facts(incident, recommendation, evidence)
 
         try:
             response = await self._client.chat.completions.create(
@@ -95,9 +99,7 @@ class ReasoningPhraser:
             logger.warning("LLM returned empty reasoning, using deterministic reasoning")
             return recommendation
 
-        allowed_ids = {incident.incident_id} | {
-            h.incident.incident_id for h in historical
-        }
+        allowed_ids = {incident.incident_id} | {h.incident.incident_id for h in evidence}
         unknown_ids = set(INCIDENT_ID_PATTERN.findall(text)) - allowed_ids
 
         if unknown_ids:
@@ -105,6 +107,14 @@ class ReasoningPhraser:
                 "LLM cited incident IDs not in evidence %s, using deterministic reasoning",
                 sorted(unknown_ids),
             )
+            return recommendation
+
+        if (
+            recommendation.confidence == "INSUFFICIENT_DATA"
+            and recommendation.intervention_category is None
+            and not any(w in text.lower() for w in ("no ", "not ", "insufficient", "none"))
+        ):
+            logger.warning("LLM reasoning did not acknowledge missing evidence, using deterministic reasoning")
             return recommendation
 
         return recommendation.model_copy(
@@ -115,44 +125,41 @@ class ReasoningPhraser:
     def _build_facts(
         incident: Incident,
         recommendation: Recommendation,
-        historical: List[HistoricalIncident],
-        successful: List[Dict[str, Any]],
-        failed: List[Dict[str, Any]],
+        evidence: List[HistoricalIncident],
     ) -> str:
-        by_id = {h.incident.incident_id: h.incident for h in historical}
-
         lines = [
             "CURRENT INCIDENT",
-            f"- Machine: {incident.machine_id} ({incident.machine_type})",
-            f"- Defect: {incident.defect_type}",
+            f"- Machine: {incident.machine_id} ({incident.machine_type.replace('_', ' ')})",
+            f"- Problem: {incident.defect_type.replace('_', ' ')}",
             f"- Symptoms: {', '.join(incident.symptoms) or 'none reported'}",
             "",
-            "DECISION (already made; do not change)",
-            f"- Recommended action: {recommendation.suggested_action}",
-            f"- Confidence: {recommendation.confidence}",
-            f"- Relevant historical incidents found: {len(historical)}",
+            "DECISION (computed by deterministic scoring; do not change it)",
+            f"- Recommended intervention: {recommendation.suggested_action}",
+            f"- Confidence: {CONFIDENCE_WORDS.get(recommendation.confidence, recommendation.confidence)}",
+            f"- Basis: {recommendation.basis}",
             "",
-            "SUCCESSFUL PAST INTERVENTIONS",
+            "EVIDENCE PER INTERVENTION (from past work orders)",
         ]
 
-        if successful:
-            for s in successful:
-                past = by_id.get(s["incident_id"])
-                machine = f" on {past.machine_id}" if past else ""
-                cause = f"; confirmed cause: {s['root_cause']}" if s.get("root_cause") else ""
-                lines.append(f"- {s['incident_id']}{machine}: \"{s['action']}\" -> SUCCESS{cause}")
+        if recommendation.evidence:
+            for s in recommendation.evidence:
+                ids = "; ".join(f"{k}: {', '.join(v)}" for k, v in s.incident_ids.items())
+                lines.append(
+                    f"- {s.intervention_category}: {s.successes} success, {s.partials} partial, "
+                    f"{s.failures} failed, {s.unknowns} unverified [{ids}]"
+                )
         else:
-            lines.append("- none")
+            lines.append("- none: no similar past incident with a recorded outcome")
 
-        lines += ["", "FAILED PAST INTERVENTIONS"]
-
-        if failed:
-            for f in failed:
-                past = by_id.get(f["incident_id"])
-                machine = f" on {past.machine_id}" if past else ""
-                lines.append(f"- {f['incident_id']}{machine}: \"{f['action']}\" -> FAILED")
-        else:
-            lines.append("- none")
+        same_machine = [h for h in evidence if h.incident.machine_id == incident.machine_id]
+        if same_machine:
+            lines += ["", f"HISTORY ON {incident.machine_id} ITSELF (newest first)"]
+            for h in sorted(same_machine, key=lambda h: h.incident.timestamp, reverse=True)[:4]:
+                p = h.incident
+                lines.append(
+                    f"- {p.incident_id} ({p.timestamp:%Y-%m-%d}): {p.intervention_category} -> "
+                    f"{p.action_outcome.value if p.action_outcome else 'no outcome'}"
+                )
 
         if recommendation.warnings:
             lines += ["", "WARNINGS"]

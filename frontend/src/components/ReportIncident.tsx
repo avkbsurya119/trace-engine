@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import type { IncidentCreate, AnalysisResult } from "@/types/incident";
+import { humanize } from "@/lib/utils";
+import type { IncidentCreate, AnalysisResult, Fleet } from "@/types/incident";
 import { AlertTriangle, X, Plus, Loader2 } from "lucide-react";
 
 interface ReportIncidentProps {
@@ -10,46 +11,7 @@ interface ReportIncidentProps {
   onCancel: () => void;
 }
 
-const MACHINE_TYPES = [
-  "CNC",
-  "Injection_Molding",
-  "Hydraulic_Press",
-  "Robotic_Welder",
-  "Laser_Cutter",
-  "Conveyor_System",
-  "Assembly_Robot",
-  "3D_Printer",
-];
-
-const DEFECT_TYPES = [
-  "surface_roughness",
-  "tool_wear",
-  "short_shot",
-  "flash_defect",
-  "sink_marks",
-  "pressure_loss",
-  "seal_failure",
-  "weld_spatter",
-  "arc_deviation",
-  "dross_buildup",
-  "dimensional_error",
-  "vibration_anomaly",
-];
-
-const COMMON_SYMPTOMS = [
-  "rough surface finish",
-  "high spindle vibration",
-  "tool chatter",
-  "excessive tool wear",
-  "incomplete fill",
-  "visible voids",
-  "pressure fluctuation",
-  "weld spatter",
-  "arc instability",
-  "inconsistent bead",
-  "dross accumulation",
-  "edge roughness",
-];
+const NEW_PROBLEM = "__new__";
 
 export function ReportIncident({
   onAnalysisComplete,
@@ -68,9 +30,45 @@ export function ReportIncident({
     operating_conditions: {},
     description: "",
     suspected_root_cause: "",
+    operating_hours: undefined,
+    technician_id: "",
   });
 
   const [customSymptom, setCustomSymptom] = useState("");
+  const [fleet, setFleet] = useState<Fleet | null>(null);
+  const [defectChoice, setDefectChoice] = useState("");
+  const [newDefect, setNewDefect] = useState("");
+
+  useEffect(() => {
+    api
+      .getFleet()
+      .then(setFleet)
+      .catch(() => setError("Could not load the machine list from the backend. Is it running?"));
+  }, []);
+
+  const machineType = useMemo(
+    () => fleet?.machine_types.find((t) => t.machine_type === formData.machine_type),
+    [fleet, formData.machine_type]
+  );
+  const symptomOptions = useMemo(
+    () => machineType?.defect_types.find((d) => d.defect_type === defectChoice)?.symptoms ?? [],
+    [machineType, defectChoice]
+  );
+
+  const selectMachineType = (value: string) => {
+    setFormData((prev) => ({ ...prev, machine_type: value, machine_id: "", production_line: "", defect_type: "", symptoms: [] }));
+    setDefectChoice("");
+  };
+
+  const selectMachine = (value: string) => {
+    const machine = machineType?.machines.find((m) => m.machine_id === value);
+    setFormData((prev) => ({ ...prev, machine_id: value, production_line: machine?.production_line ?? "" }));
+  };
+
+  const selectDefect = (value: string) => {
+    setDefectChoice(value);
+    setFormData((prev) => ({ ...prev, defect_type: value === NEW_PROBLEM ? toKey(newDefect) : value, symptoms: [] }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +76,13 @@ export function ReportIncident({
     setError(null);
 
     try {
-      const result = await api.analyzeIncident(formData);
+      const payload: IncidentCreate = {
+        ...formData,
+        defect_type: defectChoice === NEW_PROBLEM ? toKey(newDefect) : formData.defect_type,
+        suspected_root_cause: formData.suspected_root_cause || undefined,
+        technician_id: formData.technician_id || undefined,
+      };
+      const result = await api.analyzeIncident(payload);
       onAnalysisComplete(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to analyze incident");
@@ -97,7 +101,7 @@ export function ReportIncident({
   };
 
   const addCustomSymptom = () => {
-    if (customSymptom.trim() && !formData.symptoms.includes(customSymptom)) {
+    if (customSymptom.trim() && !formData.symptoms.includes(customSymptom.trim())) {
       setFormData((prev) => ({
         ...prev,
         symptoms: [...prev.symptoms, customSymptom.trim()],
@@ -133,93 +137,116 @@ export function ReportIncident({
             </div>
           )}
 
-          {/* Machine Info */}
+          {/* Machine */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">
-                Machine ID *
-              </label>
-              <input
-                type="text"
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Machine type *</label>
+              <select
                 required
-                placeholder="e.g., CNC-07"
+                value={formData.machine_type}
+                onChange={(e) => selectMachineType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+              >
+                <option value="">{fleet ? "Select machine type" : "Loading..."}</option>
+                {fleet?.machine_types.map((t) => (
+                  <option key={t.machine_type} value={t.machine_type}>
+                    {humanize(t.label)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Machine *</label>
+              <select
+                required
+                disabled={!machineType}
                 value={formData.machine_id}
+                onChange={(e) => selectMachine(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500 disabled:bg-gray-50"
+              >
+                <option value="">Select machine</option>
+                {machineType?.machines.map((m) => (
+                  <option key={m.machine_id} value={m.machine_id}>
+                    {m.machine_id} · {m.model} ({m.production_line})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Production line</label>
+              <input
+                readOnly
+                value={formData.production_line}
+                placeholder="Set by machine"
+                className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-gray-700"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Operating hours</label>
+              <input
+                type="number"
+                min={0}
+                value={formData.operating_hours ?? ""}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, machine_id: e.target.value }))
+                  setFormData((prev) => ({ ...prev, operating_hours: e.target.value ? parseInt(e.target.value) : undefined }))
                 }
+                placeholder="Hour meter"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">
-                Production Line *
-              </label>
+              <label className="block text-sm font-medium text-industrial-700 mb-1">Technician ID</label>
               <input
                 type="text"
-                required
-                placeholder="e.g., Line A"
-                value={formData.production_line}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    production_line: e.target.value,
-                  }))
-                }
+                value={formData.technician_id ?? ""}
+                onChange={(e) => setFormData((prev) => ({ ...prev, technician_id: e.target.value }))}
+                placeholder="e.g. T-117"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">
-                Machine Type *
-              </label>
-              <select
+          {/* Problem */}
+          <div>
+            <label className="block text-sm font-medium text-industrial-700 mb-1">Problem *</label>
+            <select
+              required
+              disabled={!machineType}
+              value={defectChoice}
+              onChange={(e) => selectDefect(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500 disabled:bg-gray-50"
+            >
+              <option value="">Select problem</option>
+              {machineType?.defect_types.map((d) => (
+                <option key={d.defect_type} value={d.defect_type}>
+                  {humanize(d.defect_type)}
+                </option>
+              ))}
+              <option value={NEW_PROBLEM}>Other / not listed...</option>
+            </select>
+            {defectChoice === NEW_PROBLEM && (
+              <input
                 required
-                value={formData.machine_type}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, machine_type: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
-              >
-                <option value="">Select machine type</option>
-                {MACHINE_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">
-                Defect Type *
-              </label>
-              <select
-                required
-                value={formData.defect_type}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, defect_type: e.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
-              >
-                <option value="">Select defect type</option>
-                {DEFECT_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
+                type="text"
+                value={newDefect}
+                onChange={(e) => {
+                  setNewDefect(e.target.value);
+                  setFormData((prev) => ({ ...prev, defect_type: toKey(e.target.value) }));
+                }}
+                placeholder="Short name for the problem, e.g. chip conveyor jam"
+                className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+              />
+            )}
           </div>
 
           {/* Symptoms */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-2">
-              Observed Symptoms
-            </label>
+            <label className="block text-sm font-medium text-industrial-700 mb-2">Observed symptoms</label>
             <div className="flex flex-wrap gap-2 mb-3">
-              {COMMON_SYMPTOMS.map((symptom) => (
+              {[...symptomOptions, ...formData.symptoms.filter((s) => !symptomOptions.includes(s))].map((symptom) => (
                 <button
                   key={symptom}
                   type="button"
@@ -233,14 +260,17 @@ export function ReportIncident({
                   {symptom}
                 </button>
               ))}
+              {symptomOptions.length === 0 && formData.symptoms.length === 0 && (
+                <span className="text-sm text-gray-400">Pick a problem to see common symptoms, or add your own.</span>
+              )}
             </div>
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Add custom symptom"
+                placeholder="Add symptom"
                 value={customSymptom}
                 onChange={(e) => setCustomSymptom(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addCustomSymptom())}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomSymptom())}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
               />
               <button
@@ -261,7 +291,7 @@ export function ReportIncident({
             <textarea
               required
               rows={4}
-              placeholder="Describe the incident in detail..."
+              placeholder="What was seen, when, on which part or product, readings..."
               value={formData.description}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, description: e.target.value }))
@@ -317,4 +347,8 @@ export function ReportIncident({
       </div>
     </div>
   );
+}
+
+function toKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 }

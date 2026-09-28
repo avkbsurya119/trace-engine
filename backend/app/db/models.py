@@ -98,6 +98,32 @@ class IncidentDB(Base):
         nullable=True,
     )
 
+    intervention_category: Mapped[Optional[str]] = mapped_column(
+        String(150),
+        nullable=True,
+        index=True,
+    )
+
+    severity: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    downtime_minutes: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    technician_id: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    operating_hours: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,

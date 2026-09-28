@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { cn, formatDate, getOutcomeBgColor } from "@/lib/utils";
-import type { MachineMemory as MachineMemoryType } from "@/types/incident";
+import { cn, formatDay, formatHours, getOutcomeBgColor, humanize } from "@/lib/utils";
+import type { MachineMemory as MachineMemoryType, MachineTimelineEntry } from "@/types/incident";
 import {
   ArrowLeft,
   Database,
@@ -30,6 +30,9 @@ export function MachineMemory({ machineId, onBack }: Props) {
 
   useEffect(() => {
     async function fetchMemory() {
+      setLoading(true);
+      setError(null);
+      setMemory(null);
       if (!machineId) {
         setLoading(false);
         return;
@@ -96,6 +99,11 @@ export function MachineMemory({ machineId, onBack }: Props) {
           </div>
           <div className="flex-1">
             <h3 className="text-xl font-bold text-industrial-900">{machineId}</h3>
+            {(memory.model || memory.production_line) && (
+              <p className="text-sm text-industrial-600">
+                {[memory.model, memory.production_line].filter(Boolean).join(" · ")}
+              </p>
+            )}
             <div className="flex flex-wrap gap-4 mt-2 text-sm">
               <span className="text-industrial-700">
                 <strong>{memory.total_incidents}</strong> incidents
@@ -104,7 +112,10 @@ export function MachineMemory({ machineId, onBack }: Props) {
                 <strong>{memory.recurring_defects?.length || 0}</strong> defect types
               </span>
               <span className="text-industrial-700">
-                <strong>{successRate}%</strong> success rate
+                <strong>{successRate}%</strong> of attempts worked
+              </span>
+              <span className="text-industrial-700">
+                <strong>{memory.total_downtime_hours ?? 0} h</strong> downtime logged
               </span>
             </div>
           </div>
@@ -121,36 +132,25 @@ export function MachineMemory({ machineId, onBack }: Props) {
         />
         <StatCard
           icon={<CheckCircle className="w-6 h-6 text-green-600" />}
-          label="Successful Fixes"
-          value={Object.keys(memory.successful_interventions || {}).length}
+          label="Repairs That Worked"
+          value={memory.outcome_distribution?.SUCCESS ?? 0}
           bgColor="bg-green-50"
         />
         <StatCard
           icon={<XCircle className="w-6 h-6 text-red-600" />}
           label="Failed Attempts"
-          value={Object.keys(memory.failed_interventions || {}).length}
+          value={memory.outcome_distribution?.FAILED ?? 0}
           bgColor="bg-red-50"
         />
         <StatCard
           icon={<TrendingUp className="w-6 h-6 text-blue-600" />}
-          label="Success Rate"
+          label="Attempts That Worked"
           value={`${successRate}%`}
           bgColor="bg-blue-50"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Memory Timeline */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="w-5 h-5 text-industrial-600" />
-            <h3 className="text-lg font-semibold text-industrial-900">
-              Memory Timeline
-            </h3>
-          </div>
-          <MemoryTimeline incidents={memory.recent_incidents || []} />
-        </div>
-
         {/* Recurring Defects */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -202,6 +202,16 @@ export function MachineMemory({ machineId, onBack }: Props) {
             type="failed"
           />
         </div>
+      </div>
+
+      {/* Memory Timeline */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Calendar className="w-5 h-5 text-industrial-600" />
+          <h3 className="text-lg font-semibold text-industrial-900">Memory Timeline</h3>
+          <span className="ml-auto text-xs text-gray-500">Newest first · from the work-order record</span>
+        </div>
+        <MemoryTimeline incidents={memory.timeline || []} />
       </div>
 
       {/* Intervention Chart */}
@@ -265,24 +275,15 @@ function StatCard({
   );
 }
 
-function MemoryTimeline({
-  incidents,
-}: {
-  incidents: {
-    incident_id: string;
-    timestamp: string;
-    defect_type: string;
-    action_outcome?: string;
-  }[];
-}) {
+function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
   if (incidents.length === 0) {
-    return <p className="text-gray-500 text-sm">No recent incidents.</p>;
+    return <p className="text-gray-500 text-sm">No incidents recorded.</p>;
   }
 
   return (
     <div className="relative">
       <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" />
-      <div className="space-y-4">
+      <div className="space-y-3">
         {incidents.map((incident, i) => (
           <div key={incident.incident_id} className="relative pl-8">
             <div
@@ -306,32 +307,38 @@ function MemoryTimeline({
               )}
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-500">
-                  {formatDate(incident.timestamp)}
+              <div className="flex items-center justify-between mb-1 gap-2">
+                <p className="text-sm font-medium text-gray-900">
+                  {humanize(incident.defect_type)}
+                  {i === 0 && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-xs text-industrial-600">
+                      <Zap className="w-3 h-3" />
+                      Most recent
+                    </span>
+                  )}
+                </p>
+                <span className={cn("text-xs px-2 py-0.5 rounded flex-shrink-0", getOutcomeBgColor(incident.action_outcome))}>
+                  {incident.action_outcome ?? "OPEN"}
                 </span>
-                {incident.action_outcome && (
-                  <span
-                    className={cn(
-                      "text-xs px-2 py-0.5 rounded",
-                      getOutcomeBgColor(incident.action_outcome)
-                    )}
-                  >
-                    {incident.action_outcome}
-                  </span>
-                )}
               </div>
-              <p className="text-sm font-medium text-gray-900">
-                {incident.defect_type}
+              <p className="text-xs text-gray-500">
+                {formatDay(incident.timestamp)} · {incident.incident_id}
+                {incident.technician_id ? ` · ${incident.technician_id}` : ""}
+                {incident.operating_hours ? ` · ${incident.operating_hours.toLocaleString()} h` : ""}
+                {incident.downtime_minutes ? ` · downtime ${formatHours(incident.downtime_minutes)}` : ""}
               </p>
-              <p className="text-xs text-gray-500">{incident.incident_id}</p>
+              {incident.action_taken ? (
+                <p className="text-sm text-gray-700 mt-1">
+                  {incident.intervention_category && <span className="font-medium">{incident.intervention_category}: </span>}
+                  {incident.action_taken}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 mt-1">No outcome recorded yet.</p>
+              )}
+              {incident.technician_notes && (
+                <p className="text-xs text-gray-500 mt-1">&ldquo;{incident.technician_notes}&rdquo;</p>
+              )}
             </div>
-            {i === 0 && (
-              <div className="mt-2 flex items-center gap-2 text-xs text-industrial-600">
-                <Zap className="w-3 h-3" />
-                <span>Most recent - TRACE recalls this first</span>
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -352,7 +359,7 @@ function DefectBar({
   return (
     <div>
       <div className="flex justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">{defect}</span>
+        <span className="text-sm font-medium text-gray-700">{humanize(defect)}</span>
         <span className="text-sm text-gray-500">{count} incidents</span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-4">
@@ -408,7 +415,7 @@ function InterventionList({
               type === "success" ? "text-green-600" : "text-red-600"
             )}
           >
-            {type === "success" ? "Resolved" : "Failed for"}: {defects.join(", ")}
+            {type === "success" ? "Resolved" : "Failed for"}: {countList(defects)}
           </p>
         </div>
       ))}
@@ -470,14 +477,17 @@ function InterventionChart({
 }
 
 function calculateSuccessRate(memory: MachineMemoryType): number {
-  const successCount = Object.values(memory.successful_interventions || {}).reduce(
-    (sum, arr) => sum + arr.length,
-    0
-  );
-  const failCount = Object.values(memory.failed_interventions || {}).reduce(
-    (sum, arr) => sum + arr.length,
-    0
-  );
-  const total = successCount + failCount;
-  return total > 0 ? Math.round((successCount / total) * 100) : 0;
+  const outcomes = memory.outcome_distribution ?? {};
+  const attempts = (outcomes.SUCCESS ?? 0) + (outcomes.PARTIAL ?? 0) + (outcomes.FAILED ?? 0);
+  return attempts > 0 ? Math.round(((outcomes.SUCCESS ?? 0) / attempts) * 100) : 0;
+}
+
+function countList(items: string[]): string {
+  const counts = items.reduce<Record<string, number>>((acc, item) => {
+    acc[item] = (acc[item] ?? 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts)
+    .map(([item, n]) => (n > 1 ? `${humanize(item)} ×${n}` : humanize(item)))
+    .join(", ");
 }

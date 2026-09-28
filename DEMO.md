@@ -6,139 +6,103 @@
 # Backend
 cd backend
 pip install -r requirements.txt
-cp .env.example .env  # Fill in HINDSIGHT_API_KEY and GROQ_API_KEY
-python seed_data.py
-uvicorn main:app --reload
+cp .env.example .env            # fill in HINDSIGHT_API_KEY and GROQ_API_KEY
+python seed_data.py             # 567 synthetic work orders into SQLite + Hindsight (~1 min)
+uvicorn main:app --port 8000 --reload
 
 # Frontend (separate terminal)
 cd frontend
 npm install
 npm run dev
+
+# Before each live demo: make sure AC-407 has no history
+cd backend && python -m scripts.demo --reset
 ```
 
-Open http://localhost:3000
+Open http://localhost:3000. To rehearse the memory loop without the UI: `python -m scripts.demo --runs 3`.
 
 ---
 
-## Demo Scenario: The Memory Loop
+## Scene 1: Dashboard overview
 
-### Scene 1: Dashboard Overview
+- 567 incidents, 39 machines across 5 equipment types, ~15 months of history.
+- The subtitle states the history is synthetic but operationally realistic.
+- Outcome mix: roughly half the repairs worked; failed and partial repairs are kept as evidence.
 
-1. Open the dashboard at http://localhost:3000
-2. Show the stats: 13 incidents, 7 SUCCESS, 2 FAILED
-3. Point out the defect type distribution
-4. Highlight "Hindsight Memory Active" indicator
+## Scene 2: Memory impact on the hero machines
 
-### Scene 2: Report Incident with History (CNC)
+1. Click **See Memory Impact**.
+2. Walk the three tabs: **CNC-204** spindle vibration, **HP-303** pressure loss, **CV-507** belt mistracking.
 
-1. Click "Report Incident"
-2. Fill in:
-   - Machine ID: `CNC-07`
-   - Machine Type: `CNC`
-   - Production Line: `LINE-A`
-   - Defect Type: `surface_roughness`
-   - Symptoms: Select "rough surface finish", "high spindle vibration"
-   - Description: "Surface finish degraded during aluminum machining"
-3. Click "Analyze Incident"
+**Expected (computed live, nothing stored):**
+- *Without memory:* "No evidence-backed recommendation", insufficient evidence.
+- *With memory:* a specific intervention with a computed basis, e.g. HP-303 → Relief valve replacement, HIGH ("7 of 7 recorded attempts succeeded").
+- *Trial and error cost on that machine:* e.g. HP-303 lost 3 attempts and ~75 h of downtime before the right fix.
 
-**Expected Result:**
-- Historical incidents found (4 similar CNC incidents, ~85% similarity)
-- Recommendation: "Reduced spindle speed to 3500 RPM" (from TRC-CNC-001)
-- Confidence: LOW or MEDIUM (based on evidence)
-- Reasoning shows AI-phrased badge
-- Failed interventions shown (TRC-CNC-002: increased feed rate - FAILED)
+## Scene 3: A brand-new problem (no history)
 
-### Scene 3: Report Incident with No History (New Machine Type)
+1. **Report Incident** → Rotary screw air compressor → **AC-407** (commissioned 2026-08) → problem **Condensate drain failure**.
+2. Symptoms: *water in compressed air line*, *auto drain not cycling*.
+3. Description: "Water spitting from the air drops at the molding hall. Electronic drain on the wet receiver is not cycling."
+4. **Analyze Incident**.
 
-1. Click "Report Incident"
-2. Fill in:
-   - Machine ID: `LASER-NEW-01`
-   - Machine Type: `Laser_Cutter`
-   - Production Line: `PROTO-LAB`
-   - Defect Type: `dross_buildup`
-   - Symptoms: Select "dross accumulation", "edge roughness"
-   - Description: "Excessive dross on cut edges"
-3. Click "Analyze Incident"
+**Expected:**
+- "No Relevant History Found": Hindsight recalled ~67 compressor work orders, none about this problem.
+- Recommendation: **No evidence-backed recommendation** (Insufficient evidence). TRACE does not guess.
+- The AI-written summary (dashed purple box) says the same.
 
-**Expected Result:**
-- No historical incidents (or few if LASER data exists)
-- Recommendation: Generic troubleshooting
-- Confidence: INSUFFICIENT_DATA
-- Warning: "This is the first recorded incident of this type"
+## Scene 4: Record the outcome
 
-### Scene 4: Record Outcome (Building Memory)
+1. **Record what was done and whether it worked**.
+2. Intervention type: *Condensate drain replacement*; action: "Replaced zero-loss condensate drain on wet receiver and cleaned inlet strainer"; outcome **SUCCESS**; root cause "Drain inlet strainer blocked with rust"; repair 55 min, downtime 90 min.
+3. **Save to memory** → "Saved to SQLite and Hindsight".
 
-1. From the analysis screen, scroll to "Record Outcome"
-2. Fill in:
-   - Action Performed: "Reduced cutting speed and increased assist gas pressure"
-   - Outcome: SUCCESS
-   - Confirmed Root Cause: "Cutting speed too high for material thickness"
-   - Resolution Time: 20
-   - Notes: "Also cleaned nozzle"
-3. Click "Save to Memory"
+## Scene 5: The memory loop
 
-**Expected Result:**
-- "Saved to Memory" confirmation
-- This incident is now in Hindsight for future recall
+1. Report a similar incident on **AC-407**: symptoms *water in compressed air line*, *wet receiver tank level high*; "Moisture again at molding hall drops; drain does not seem to discharge."
+2. Analyze.
 
-### Scene 5: The Memory Loop (New Similar Incident)
+**Expected:**
+- "TRACE Found 1 Related Historical Incident (1 on AC-407)".
+- *What TRACE remembered → Worked:* the incident from Scene 3 (tagged **this machine**, ~85% match), with its action, confirmed cause, technician notes and the text recalled from Hindsight.
+- Recommendation: **Condensate drain replacement**, **LOW** confidence, basis "1 of 1 recorded attempt … succeeded (1 on AC-407)".
+- The AI summary cites the Scene 3 incident ID.
 
-1. Report another incident:
-   - Machine ID: `LASER-NEW-02`
-   - Machine Type: `Laser_Cutter`
-   - Defect Type: `dross_buildup`
-   - Description: "Same dross issue on different laser"
-2. Analyze
+## Scene 6: Machine memory
 
-**Expected Result:**
-- Now recalls the first LASER incident (~85% similarity)
-- Recommends: "Reduced cutting speed and increased assist gas pressure"
-- Shows as successful intervention
-- Memory is learning!
+1. Sidebar → Machine Memory → `CNC-204` (or click the CNC card on the dashboard).
 
-### Scene 6: Machine Memory View
+**Expected:**
+- 15 incidents, recurring problems, what has / hasn't worked.
+- Timeline shows the spindle chain: Nov 2025 alignment **FAILED** → bearing replacement **SUCCESS**; Jun 2026 re-lubrication **PARTIAL** → bearing replacement **SUCCESS**, with the technicians' notes.
 
-1. Click "View Machine Memory" from analysis screen
-2. Or use sidebar search: enter `CNC-01`
-
-**Expected Result:**
-- Shows machine's incident history
-- Recurring defects with counts
-- What has worked vs what hasn't
-- Recent incidents timeline
+Optional contrast: report CNC-204 spindle vibration and show that bearing replacement comes back with **LOW** confidence because it also failed on other machines where the cause was different, and that CNC-204's failed alignment is listed.
 
 ---
 
-## Key Demo Points
+## Key demo points
 
-1. **Semantic Search**: Hindsight finds similar incidents even with different wording
-2. **Machine Type Isolation**: CNC incidents don't contaminate Laser recommendations
-3. **Learning Loop**: First incident builds memory for future incidents
-4. **Evidence-Based**: Shows exactly which incidents support the recommendation
-5. **LLM Phrasing**: Reasoning is human-readable, not template-based
-6. **Fallback**: Works without LLM (deterministic reasoning)
+1. **Memory, not lookup:** Hindsight ranks work orders by meaning; each evidence card shows the memory text it recalled.
+2. **Machine-type isolation:** recall is tag-filtered, so press repairs never appear as evidence for a CNC.
+3. **Failures are evidence:** failed and partial repairs are shown and lower confidence.
+4. **Deterministic decision:** action and confidence come from outcome counts; the LLM only writes the summary and cannot cite anything that wasn't retrieved.
+5. **Honest when empty:** no history → no recommendation.
 
 ---
 
-## API Endpoints for CLI Demo
+## CLI
 
 ```bash
-# Health check
-curl http://localhost:8000/api/dashboard/health
-
-# Dashboard stats
 curl http://localhost:8000/api/dashboard/stats
+curl http://localhost:8000/api/dashboard/hero-machines
+curl http://localhost:8000/api/incidents/machine/CV-507/memory
 
-# Analyze incident
-curl -X POST http://localhost:8000/api/incidents/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"machine_id":"CNC-07","machine_type":"CNC","production_line":"LINE-A","defect_type":"surface_roughness","symptoms":["rough surface finish"],"description":"Surface degraded"}'
+curl -X POST http://localhost:8000/api/incidents/analyze -H "Content-Type: application/json" -d '{
+  "machine_id": "CV-507", "machine_type": "Belt_Conveyor", "production_line": "Packing",
+  "defect_type": "belt_mistracking",
+  "symptoms": ["belt running off to one side", "belt edge fraying"],
+  "description": "Belt tracking 21 mm to the drive side again, edge fraying near the tail."
+}'
 
-# Record outcome
-curl -X PATCH http://localhost:8000/api/incidents/{incident_id}/outcome \
-  -H "Content-Type: application/json" \
-  -d '{"action_taken":"Fixed it","action_outcome":"SUCCESS","confirmed_root_cause":"The cause"}'
-
-# Machine memory
-curl http://localhost:8000/api/incidents/machine/CNC-01/memory
+python -m scripts.validate_scenarios   # all six scenarios with checks
 ```

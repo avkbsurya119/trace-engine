@@ -1,12 +1,41 @@
 """
 Recommendation Engine
 
-Generates evidence-based troubleshooting recommendations
-based on historical incident data.
+Deterministic scoring over retrieved historical evidence. No LLM is
+involved here: the winning intervention, its confidence and the warnings
+are computed from outcome counts so the result can never be hallucinated.
+
+Scoring, per intervention category across the evidence set:
+    score = successes + 0.5 * partials - failures
+            + 0.5 * same-machine successes - 0.5 * same-machine failures
+
+Confidence for the winning category (UNKNOWN outcomes are not attempts):
+    HIGH    >= 3 successes and success rate >= 75%, or
+            >= 2 successes on this same machine, none failed there,
+            >= 3 successes overall and success rate >= 60%
+    MEDIUM  >= 2 successes and success rate >= 50%
+    LOW     any other positive evidence
+    INSUFFICIENT_DATA  no evidence, or no intervention has ever succeeded
 """
 
-from typing import List, Dict, Any
-from app.models import Incident, HistoricalIncident, Recommendation, ActionOutcome
+from collections import OrderedDict
+from typing import Dict, List
+
+from app.models import (
+    ActionOutcome,
+    EvidenceSummary,
+    HistoricalIncident,
+    Incident,
+    Recommendation,
+)
+
+HIGH_MIN_SUCCESSES = 3
+HIGH_MIN_RATE = 0.75
+HIGH_SAME_MACHINE_MIN_SUCCESSES = 2
+HIGH_SAME_MACHINE_MIN_RATE = 0.6
+MEDIUM_MIN_SUCCESSES = 2
+MEDIUM_MIN_RATE = 0.5
+NO_RECOMMENDATION = "No evidence-backed recommendation"
 
 
 class RecommendationEngine:
@@ -15,190 +44,192 @@ class RecommendationEngine:
     def generate_recommendation(
         self,
         incident: Incident,
-        historical_incidents: List[HistoricalIncident],
-        successful_interventions: List[Dict[str, Any]],
-        failed_interventions: List[Dict[str, Any]],
+        evidence: List[HistoricalIncident],
     ) -> Recommendation:
-        """
-        Generate a recommendation based on historical evidence.
+        summaries = self.tally(incident, evidence)
 
-        Args:
-            incident: Current incident
-            historical_incidents: Similar historical incidents
-            successful_interventions: Previously successful actions
-            failed_interventions: Previously failed actions
-
-        Returns:
-            Recommendation with reasoning
-        """
-        # No historical data
-        if not historical_incidents:
-            return self._generate_no_history_recommendation(incident)
-
-        # Has successful interventions
-        if successful_interventions:
-            return self._generate_evidence_based_recommendation(
-                incident,
-                historical_incidents,
-                successful_interventions,
-                failed_interventions,
+        if not evidence:
+            return Recommendation(
+                suggested_action=NO_RECOMMENDATION,
+                confidence="INSUFFICIENT_DATA",
+                basis=(
+                    f"Memory holds no earlier {incident.defect_type.replace('_', ' ')} incident "
+                    f"with a recorded outcome for this machine type."
+                ),
+                reasoning=(
+                    f"TRACE found no earlier {incident.defect_type.replace('_', ' ')} incidents on "
+                    f"{incident.machine_type.replace('_', ' ')} machines with a recorded outcome, so it "
+                    "has no historical evidence to recommend a specific intervention. Diagnose on site and "
+                    "record what was done and whether it worked; the next similar incident will use it."
+                ),
+                supporting_incidents=[],
+                warnings=["No historical evidence: do not treat any action as proven for this problem."],
+                evidence=[],
             )
 
-        # Only failed interventions
-        if failed_interventions:
-            return self._generate_failed_only_recommendation(
-                incident,
-                failed_interventions,
+        winner = next((s for s in summaries if s.successes > 0 and s.score > 0), None)
+
+        if winner is None:
+            tried = ", ".join(
+                f"{s.intervention_category} ({s.failures} failed, {s.partials} partial)"
+                for s in summaries[:3]
+            )
+            return Recommendation(
+                suggested_action=NO_RECOMMENDATION,
+                confidence="INSUFFICIENT_DATA",
+                basis=f"{len(evidence)} similar incident(s) found, but no intervention has a recorded success.",
+                reasoning=(
+                    f"TRACE found {len(evidence)} similar incident(s), but none of the interventions tried "
+                    f"has a recorded success: {tried}. There is no evidence-backed action; escalate for "
+                    "root-cause diagnosis rather than repeating these."
+                ),
+                supporting_incidents=[h.incident.incident_id for h in evidence],
+                warnings=[
+                    f"{s.intervention_category} did not resolve this before "
+                    f"({', '.join(s.incident_ids.get('FAILED', []) + s.incident_ids.get('PARTIAL', []))})."
+                    for s in summaries[:3]
+                ],
+                evidence=summaries,
             )
 
-        # Historical incidents without outcomes
-        return self._generate_partial_history_recommendation(
-            incident,
-            historical_incidents,
+        attempts = winner.successes + winner.partials + winner.failures
+        rate = winner.successes / attempts if attempts else 0.0
+        proven_here = (
+            winner.same_machine_successes >= HIGH_SAME_MACHINE_MIN_SUCCESSES
+            and winner.same_machine_failures == 0
+            and winner.successes >= HIGH_MIN_SUCCESSES
+            and rate >= HIGH_SAME_MACHINE_MIN_RATE
         )
-
-    def _generate_no_history_recommendation(
-        self,
-        incident: Incident,
-    ) -> Recommendation:
-        """Generate recommendation when no history exists."""
-        return Recommendation(
-            suggested_action=self._get_default_action(incident),
-            confidence="INSUFFICIENT_DATA",
-            reasoning=(
-                f"No relevant historical incidents found for {incident.machine_type} "
-                f"with {incident.defect_type} defects. Recommendation is based on "
-                "general troubleshooting principles. Please record the outcome of any "
-                "intervention to improve future recommendations."
-            ),
-            supporting_incidents=[],
-            warnings=[
-                "This is the first recorded incident of this type.",
-                "Verify the suggested action with experienced personnel.",
-            ],
-        )
-
-    def _generate_evidence_based_recommendation(
-        self,
-        incident: Incident,
-        historical: List[HistoricalIncident],
-        successful: List[Dict[str, Any]],
-        failed: List[Dict[str, Any]],
-    ) -> Recommendation:
-        """Generate recommendation based on successful interventions."""
-        # Find the most common successful action
-        action_counts = {}
-        for s in successful:
-            action = s["action"]
-            action_counts[action] = action_counts.get(action, 0) + 1
-
-        best_action = max(action_counts.keys(), key=lambda a: action_counts[a])
-        success_count = action_counts[best_action]
-
-        # Check if this action ever failed
-        failed_actions = {f["action"] for f in failed}
-
-        # Build reasoning
-        reasoning_parts = [
-            f"Found {len(historical)} relevant historical incident(s) for "
-            f"{incident.machine_type} machines with {incident.defect_type} defects."
-        ]
-
-        reasoning_parts.append(
-            f'"{best_action}" resolved {success_count} similar incident(s) successfully.'
-        )
-
-        # Mention failed alternatives
-        if failed:
-            failed_list = ", ".join(f'"{f["action"]}"' for f in failed[:3])
-            reasoning_parts.append(
-                f"Previously unsuccessful approaches: {failed_list}."
-            )
-
-        # Determine confidence
-        if success_count >= 3 and best_action not in failed_actions:
+        if (winner.successes >= HIGH_MIN_SUCCESSES and rate >= HIGH_MIN_RATE) or proven_here:
             confidence = "HIGH"
-        elif success_count >= 2:
+        elif winner.successes >= MEDIUM_MIN_SUCCESSES and rate >= MEDIUM_MIN_RATE:
             confidence = "MEDIUM"
         else:
             confidence = "LOW"
 
-        warnings = []
-        if best_action in failed_actions:
+        warnings: List[str] = []
+        if winner.same_machine_failures and not winner.same_machine_successes:
+            confidence = {"HIGH": "MEDIUM", "MEDIUM": "LOW"}.get(confidence, confidence)
             warnings.append(
-                f'Note: "{best_action}" has also failed in some cases. '
-                "Review the specific conditions of those failures."
+                f"{winner.intervention_category} has failed on {incident.machine_id} before "
+                f"({', '.join(winner.incident_ids.get('FAILED', []))}) and never succeeded there."
+            )
+        if winner.failures:
+            warnings.append(
+                f"{winner.intervention_category} also failed {winner.failures} time(s) on similar incidents "
+                f"({', '.join(winner.incident_ids.get('FAILED', []))}): the cause may differ this time."
+            )
+        for other in summaries:
+            if other is winner or other.failures == 0:
+                continue
+            warnings.append(
+                f"{other.intervention_category} failed {other.failures} of "
+                f"{other.successes + other.partials + other.failures} attempt(s) "
+                f"({', '.join(other.incident_ids.get('FAILED', []))})."
+            )
+            if len(warnings) >= 4:
+                break
+        if not any(h.incident.machine_id == incident.machine_id for h in evidence):
+            warnings.append(
+                f"No earlier record of this problem on {incident.machine_id}; evidence comes from other "
+                f"{incident.machine_type.replace('_', ' ')} machines."
             )
 
+        same = winner.same_machine_successes
+        basis = (
+            f"{winner.successes} of {attempts} recorded attempt(s) with {winner.intervention_category} "
+            f"on similar incidents succeeded"
+            + (f" ({same} on {incident.machine_id})" if same else "")
+            + f"; {winner.failures} failed, {winner.partials} partial."
+        )
+
         return Recommendation(
-            suggested_action=best_action,
+            suggested_action=winner.intervention_category,
+            intervention_category=winner.intervention_category,
             confidence=confidence,
-            reasoning=" ".join(reasoning_parts),
-            supporting_incidents=[s["incident_id"] for s in successful],
+            basis=basis,
+            reasoning=self._deterministic_reasoning(incident, evidence, winner, summaries),
+            supporting_incidents=winner.incident_ids.get("SUCCESS", []),
             warnings=warnings,
+            evidence=summaries,
         )
 
-    def _generate_failed_only_recommendation(
-        self,
-        incident: Incident,
-        failed: List[Dict[str, Any]],
-    ) -> Recommendation:
-        """Generate recommendation when only failed interventions exist."""
-        failed_actions = [f["action"] for f in failed]
+    # ------------------------------------------------------------------
 
-        return Recommendation(
-            suggested_action=self._get_default_action(incident),
-            confidence="LOW",
-            reasoning=(
-                f"Previous interventions for similar incidents have failed: "
-                f"{', '.join(f'\"' + a + '\"' for a in failed_actions[:3])}. "
-                "A different approach may be needed. Consider escalating to "
-                "engineering or investigating root cause more thoroughly."
-            ),
-            supporting_incidents=[f["incident_id"] for f in failed],
-            warnings=[
-                "Previous similar interventions have not been successful.",
-                "Consider root cause analysis before proceeding.",
-                "Escalation to engineering may be appropriate.",
-            ],
+    @staticmethod
+    def tally(incident: Incident, evidence: List[HistoricalIncident]) -> List[EvidenceSummary]:
+        groups: "OrderedDict[str, Dict]" = OrderedDict()
+        # Newest first so example_action is the most recent instance.
+        ordered = sorted(evidence, key=lambda h: h.incident.timestamp, reverse=True)
+
+        for hist in ordered:
+            past = hist.incident
+            category = (past.intervention_category or past.action_taken or "").strip()
+            if not category or past.action_outcome is None:
+                continue
+            g = groups.setdefault(category, {
+                "example_action": None, "fallback_action": past.action_taken or category,
+                "counts": {o.value: 0 for o in ActionOutcome},
+                "ids": {o.value: [] for o in ActionOutcome},
+                "same_s": 0, "same_f": 0,
+            })
+            outcome = past.action_outcome.value
+            g["counts"][outcome] += 1
+            g["ids"][outcome].append(past.incident_id)
+            same_machine = past.machine_id == incident.machine_id
+            if outcome == "SUCCESS":
+                g["example_action"] = g["example_action"] or past.action_taken
+                g["same_s"] += int(same_machine)
+            elif outcome == "FAILED":
+                g["same_f"] += int(same_machine)
+
+        summaries = []
+        for category, g in groups.items():
+            c = g["counts"]
+            score = (
+                c["SUCCESS"] + 0.5 * c["PARTIAL"] - c["FAILED"]
+                + 0.5 * g["same_s"] - 0.5 * g["same_f"]
+            )
+            summaries.append(EvidenceSummary(
+                intervention_category=category,
+                example_action=g["example_action"] or g["fallback_action"],
+                successes=c["SUCCESS"],
+                partials=c["PARTIAL"],
+                failures=c["FAILED"],
+                unknowns=c["UNKNOWN"],
+                same_machine_successes=g["same_s"],
+                same_machine_failures=g["same_f"],
+                score=round(score, 2),
+                incident_ids={k: v for k, v in g["ids"].items() if v},
+            ))
+
+        summaries.sort(key=lambda s: (s.score, s.successes, -s.failures), reverse=True)
+        return summaries
+
+    @staticmethod
+    def _deterministic_reasoning(incident, evidence, winner, summaries) -> str:
+        parts = [
+            f"TRACE found {len(evidence)} similar {incident.defect_type.replace('_', ' ')} incident(s) "
+            f"with recorded outcomes."
+        ]
+        ids = ", ".join(winner.incident_ids.get("SUCCESS", [])[:4])
+        parts.append(
+            f"{winner.intervention_category} resolved {winner.successes} of them ({ids})."
         )
-
-    def _generate_partial_history_recommendation(
-        self,
-        incident: Incident,
-        historical: List[HistoricalIncident],
-    ) -> Recommendation:
-        """Generate recommendation when history exists but no outcomes recorded."""
-        return Recommendation(
-            suggested_action=self._get_default_action(incident),
-            confidence="INSUFFICIENT_DATA",
-            reasoning=(
-                f"Found {len(historical)} historical incident(s) but none have "
-                "recorded outcomes. Unable to determine which interventions were "
-                "successful. Please record outcomes for historical incidents to "
-                "improve future recommendations."
-            ),
-            supporting_incidents=[h.incident.incident_id for h in historical],
-            warnings=[
-                "Historical outcomes not recorded.",
-                "Recommendation based on general principles.",
-            ],
-        )
-
-    def _get_default_action(self, incident: Incident) -> str:
-        """Get a default action based on defect type."""
-        defaults = {
-            "Surface Defect": "Inspect tooling and cutting parameters",
-            "Dimensional Error": "Verify calibration and measure tool wear",
-            "Vibration": "Check bearings, alignment, and mounting",
-            "Temperature Anomaly": "Inspect cooling system and lubrication",
-            "Noise": "Inspect bearings and mechanical components",
-            "Power Fluctuation": "Check electrical connections and supply",
-            "Pressure Drop": "Inspect seals, hoses, and pump",
-            "Speed Variation": "Check drive system and encoder",
-        }
-
-        return defaults.get(
-            incident.defect_type,
-            "Perform visual inspection and basic diagnostics",
-        )
+        if winner.failures:
+            parts.append(
+                f"It also failed {winner.failures} time(s) "
+                f"({', '.join(winner.incident_ids.get('FAILED', [])[:3])})."
+            )
+        failed_others = [s for s in summaries if s is not winner and s.failures > s.successes]
+        if failed_others:
+            parts.append(
+                "Less effective before: "
+                + "; ".join(
+                    f"{s.intervention_category} failed {s.failures}x "
+                    f"({', '.join(s.incident_ids.get('FAILED', [])[:2])})"
+                    for s in failed_others[:2]
+                )
+                + "."
+            )
+        return " ".join(parts)
