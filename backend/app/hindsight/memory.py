@@ -17,6 +17,7 @@ from datetime import timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.config import settings
+from app.core.errors import MemoryUnavailableError
 from app.data.catalog import FLEET
 from app.data.generator import slug
 from app.db.repository import IncidentRepository
@@ -187,13 +188,18 @@ class MemoryService:
 
         await self.repository.create(incident)
         item = self._retain_item(incident)
-        await self.client.retain(
-            document_id=item["document_id"],
-            narrative=item["narrative"],
-            tags=item["tags"],
-            metadata=item["metadata"],
-            timestamp=item["timestamp"],
-        )
+        try:
+            await self.client.retain(
+                document_id=item["document_id"],
+                narrative=item["narrative"],
+                tags=item["tags"],
+                metadata=item["metadata"],
+                timestamp=item["timestamp"],
+            )
+        except Exception as exc:
+            # Keep the two stores consistent: no SQLite row without a memory.
+            await self.repository.delete_many([incident.incident_id])
+            raise MemoryUnavailableError(f"Could not store incident in Hindsight: {exc}") from exc
         return incident.incident_id
 
     async def retain_many(self, incidents: List[Incident]) -> int:
@@ -240,10 +246,13 @@ class MemoryService:
         # Two recalls in parallel: similar incidents across the fleet of this
         # machine type, and this machine's own history (so a recurring fault
         # is never crowded out by look-alikes on other machines).
-        fleet_memories, machine_memories = await asyncio.gather(
-            self.client.recall(query=query, tags=[type_tag]),
-            self.client.recall(query=query, tags=[type_tag, machine_tag], max_tokens=3000),
-        )
+        try:
+            fleet_memories, machine_memories = await asyncio.gather(
+                self.client.recall(query=query, tags=[type_tag]),
+                self.client.recall(query=query, tags=[type_tag, machine_tag], max_tokens=3000),
+            )
+        except Exception as exc:
+            raise MemoryUnavailableError(f"Hindsight recall failed: {exc}") from exc
         memories = fleet_memories + machine_memories
 
         facts_by_doc: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -327,6 +336,7 @@ class MemoryService:
         incident = await self.repository.get(incident_id)
         if not incident:
             return None
+        previous = incident.model_copy(deep=True)
 
         incident.action_taken = update.action_taken
         incident.action_outcome = update.action_outcome
@@ -343,14 +353,19 @@ class MemoryService:
             return None
 
         item = self._retain_item(updated)
-        await self.client.retain(
-            document_id=item["document_id"],
-            narrative=item["narrative"],
-            tags=item["tags"],
-            metadata=item["metadata"],
-            timestamp=item["timestamp"],
-            replace=True,
-        )
+        try:
+            await self.client.retain(
+                document_id=item["document_id"],
+                narrative=item["narrative"],
+                tags=item["tags"],
+                metadata=item["metadata"],
+                timestamp=item["timestamp"],
+                replace=True,
+            )
+        except Exception as exc:
+            # Roll SQLite back so it never claims an outcome memory lacks.
+            await self.repository.update(previous)
+            raise MemoryUnavailableError(f"Could not update Hindsight memory: {exc}") from exc
         return updated
 
     async def delete_incidents(self, incident_ids: List[str]) -> int:
