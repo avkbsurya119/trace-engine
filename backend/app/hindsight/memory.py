@@ -275,6 +275,13 @@ class MemoryService:
             if historical is None:
                 continue
 
+            # All machine types share one Hindsight bank, so semantic
+            # recall also surfaces other machine types. Their actions
+            # (e.g. "increase press force") are not evidence for this
+            # machine, so keep only the same machine type.
+            if historical.machine_type != incident.machine_type:
+                continue
+
             # Only historical incidents with an actual recorded
             # troubleshooting outcome are useful evidence.
             if historical.action_outcome is None:

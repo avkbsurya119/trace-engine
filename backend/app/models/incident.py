@@ -116,6 +116,10 @@ class Recommendation(BaseModel):
     warnings: List[str] = Field(
         default_factory=list, description="Any cautions or warnings"
     )
+    reasoning_source: str = Field(
+        default="deterministic",
+        description="Who wrote the reasoning text: 'llm' or 'deterministic' (fallback)",
+    )
 
 
 class AnalysisResult(BaseModel):

@@ -17,6 +17,7 @@ from app.models import (
     ActionOutcome,
 )
 from app.hindsight import MemoryService
+from .phrasing import ReasoningPhraser
 from .recommendation import RecommendationEngine
 
 
@@ -26,10 +27,12 @@ class AnalysisService:
     def __init__(self):
         self.memory = MemoryService()
         self.recommender = RecommendationEngine()
+        self.phraser = ReasoningPhraser()
 
     async def close(self):
         """Close underlying services."""
         await self.memory.close()
+        await self.phraser.close()
 
     async def analyze_incident(
         self,
@@ -51,14 +54,15 @@ class AnalysisService:
             **incident_data.model_dump(),
         )
 
-        # Store incident in memory (without outcome yet)
-        await self.memory.store_incident(incident)
-
-        # Search for similar historical incidents
+        # 1. Recall: search memory before storing, so the new incident
+        #    can never match itself.
         historical = await self.memory.search_similar_incidents(
             incident_data,
             limit=10,
         )
+
+        # Store incident in memory (without outcome yet)
+        await self.memory.store_incident(incident)
 
         # Separate successful and failed interventions
         successful = []
@@ -81,12 +85,21 @@ class AnalysisService:
                     "relevance": hist.relevance_factors,
                 })
 
-        # Generate recommendation
+        # 2. Score: deterministic, no LLM involved.
         recommendation = self.recommender.generate_recommendation(
             incident=incident,
             historical_incidents=historical,
             successful_interventions=successful,
             failed_interventions=failed,
+        )
+
+        # 3. Phrase: LLM rewords the already-computed evidence only.
+        recommendation = await self.phraser.phrase(
+            incident=incident,
+            recommendation=recommendation,
+            historical=historical,
+            successful=successful,
+            failed=failed,
         )
 
         # Build memory contribution explanation
