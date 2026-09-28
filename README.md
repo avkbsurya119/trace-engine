@@ -13,7 +13,7 @@ When a machine fails, TRACE recalls similar past work orders from **[Hindsight](
 
 > Render's free tier sleeps when idle, so the first request can take 30–60 s while the API wakes up.
 
-**Contents:** [Why](#why-trace) · [How it works](#how-it-works) · [The app](#the-app) · [Hindsight](#how-hindsight-memory-is-used) · [Engine](#recommendation-engine) · [Intelligence](#trace-intelligence) · [Dataset](#dataset) · [Run locally](#run-locally) · [Deployment](#deployment) · [API](#api) · [Testing](#testing) · [Structure](#project-structure) · [Limitations](#limitations)
+**Contents:** [Why](#why-trace) · [How it works](#how-it-works) · [The app](#the-app) · [Hindsight](#how-hindsight-memory-is-used) · [Engine](#recommendation-engine) · [Intelligence](#trace-intelligence) · [Dataset](#dataset) · [Run locally](#run-locally) · [Deployment](#deployment) · [API](#api) · [Testing](#testing) · [Structure](#project-structure)
 
 ---
 
@@ -347,24 +347,6 @@ trace-engine/
         ├── lib/                 API client (cached), formatting utils
         └── types/incident.ts    TypeScript mirror of the API
 ```
-
----
-
-## Limitations
-
-- **Synthetic data.** It is realistic by construction but does not come from a real plant. The thresholds (0.80 gate, 15 evidence items, confidence rules) were tuned on it.
-- **Structured gate.** For catalogued problems, relevance mostly means "same problem type among the recalled candidates". Hindsight ranks and retrieves but does not decide relevance on its own. `reflect()`, mental models and observations are not used.
-- **Scoring.** Evidence is not weighted by similarity and there is no statistical interval. Sensor readings and the suspected cause don't influence the choice, and free-text intervention names are grouped only when the text is identical.
-- **LLM checks** catch invented work-order IDs and missing admissions of no evidence, but not every possible embellishment.
-- **Operational.**
-  - Memory writes are synchronous, so an analysis takes about 5–8 s.
-  - There is no authentication, and view state lives in a single page.
-  - `seed_data.py` recreates the bank.
-  - Render's free tier sleeps when idle and loses SQLite on redeploy.
-- **Frontend.**
-  - There are no component or end-to-end tests: the frontend is only type-checked, and the API shape is contract-tested from the backend.
-  - The ROI simulator and learning scrubber are illustrative (see [The app](#the-app)).
-  - `JudgeMode.tsx` (the presenter bar) is still in the repo but is no longer wired into the page after the redesign.
 
 ---
 

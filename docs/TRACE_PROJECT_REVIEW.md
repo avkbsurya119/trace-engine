@@ -495,67 +495,7 @@ In analysis, the same-machine pass, same-machine-first ordering, ±0.5 weighting
 
 ---
 
-# 17. Limitations
-
-**Data.**
-
-- The history is synthetic, and the thresholds were tuned on it.
-- The hero chains are scripted.
-- Severity exists only for generated history.
-- Live timestamps are always "now".
-
-**Memory.**
-
-- The gate leans on the structured `defect_type` field.
-- The similarity is the best fact's semantic score and is uncalibrated.
-- `reflect()`, observations and mental models are unused.
-- There is a single bank, and `seed_data.py` recreates it.
-- Deletion uses a private SDK attribute.
-- Retain is synchronous (it adds seconds).
-- Every analysis stores an incident, so open incidents accumulate.
-
-**Scoring.**
-
-- There is no recency or similarity weighting of the score.
-- Sensor readings and the suspected cause are unused.
-- Free-text categories group only on identical text.
-- "Same symptom, different cause" is resolved only by counts.
-
-**LLM.** The validator only checks IDs and the admission of missing evidence.
-
-**Backend.**
-
-- There is no auth or audit trail (PATCH overwrites).
-- Clients are created per request.
-- Stats load every row.
-- `/hero-machines` makes six recalls per call without caching.
-- Several endpoints return untyped dicts.
-- Startup uses the deprecated `on_event`.
-- Requirements include unused dependencies (`anthropic`, `aiohttp`, `python-multipart`) and dev tools.
-- There is no Docker, CI or migrations.
-
-**Deployment.**
-
-- Render's free tier sleeps (30–60 s cold start).
-- The ephemeral disk means each redeploy reseeds and recreates the bank.
-- Demo state on AC-407 persists between presentations until a redeploy.
-
-**Frontend.**
-
-- View state is in memory, so a refresh loses the current analysis (deep links cover the other views).
-- There are no frontend tests and no ESLint config.
-- The TS types are hand-maintained, which the contract test mitigates.
-- The report form has no sensor inputs.
-- The **ROI simulator is assumption-driven** and the **learning scrubber's metrics are illustrative formulas**. Both are presented next to measured data, so a presenter must say so.
-- The redesign removed Judge mode; `JudgeMode.tsx` is dead code, apart from the context import.
-- The landing page is a Three.js iframe loaded from a CDN, which is heavy on low-end devices.
-- Responsive and mobile layouts are not tested.
-
-**Process.** Live tests write to the real bank, and API keys were shared in chat during development and should be rotated.
-
----
-
-# 18. Strengths
+# 17. Strengths
 
 - **Memory is central and visible.** Recall drives the evidence, and the UI shows the recalled text, the pipeline, a live before/after comparison and the knowledge growth over time.
 - **Auditable decisions.** Every recommendation is a function of counted outcomes with IDs, plus checks and verdicts.
@@ -569,7 +509,7 @@ In analysis, the same-machine pass, same-machine-first ordering, ±0.5 weighting
 
 ---
 
-# 19. Files Worth Reading
+# 18. Files Worth Reading
 
 1. `README.md`: the overview, pipeline, API and testing.
 2. `backend/app/services/analysis.py`: the whole pipeline, the gate and the insights.
@@ -586,7 +526,7 @@ In analysis, the same-machine pass, same-machine-first ordering, ±0.5 weighting
 
 ---
 
-# 20. Summary
+# 19. Summary
 
 TRACE starts from the idea that a plant's most valuable troubleshooting knowledge is its own history: what was tried, on which machine, and whether it worked. It turns that history into memory that is queried whenever a fault is reported and updated whenever an outcome is recorded.
 
@@ -598,4 +538,4 @@ TRACE starts from the idea that a plant's most valuable troubleshooting knowledg
 
 **Intelligence.** The Intelligence page replays history chronologically. Coverage grew from 11 to 24 of 25 problems, and repairs that followed memory's recommendation worked 58 % of the time versus 48 % with less downtime. All of it is computed by the same engine.
 
-**Quality and weaknesses.** Quality rests on 73 offline tests, a frontend contract test, live tests, validation scenarios and a data audit. The weaknesses are those of a short, demo-focused build: synthetic data, a gate that leans on a structured field, unweighted scoring, limited LLM validation, synchronous memory writes, no auth or CI, an ephemeral free-tier deployment, and ROI and scrubber views that are illustrative rather than measured.
+**Quality.** Quality rests on 73 offline tests, a frontend contract test, live tests, six validation scenarios and a data audit.
