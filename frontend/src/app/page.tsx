@@ -6,6 +6,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { ReportIncident } from "@/components/ReportIncident";
 import { IncidentAnalysis } from "@/components/IncidentAnalysis";
 import { MachineMemory } from "@/components/MachineMemory";
+import { BeforeAfterMemory } from "@/components/BeforeAfterMemory";
 import type { AnalysisResult } from "@/types/incident";
 
 type View = "dashboard" | "report" | "analysis" | "memory";
@@ -16,6 +17,7 @@ export default function Home() {
     null
   );
   const [selectedMachineId, setSelectedMachineId] = useState<string>("");
+  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
 
   const handleAnalysisComplete = (result: AnalysisResult) => {
     setAnalysisResult(result);
@@ -42,6 +44,7 @@ export default function Home() {
           <Dashboard
             onReportIncident={() => setCurrentView("report")}
             onViewMachineMemory={handleViewMachineMemory}
+            onShowBeforeAfter={() => setShowBeforeAfter(true)}
           />
         );
       case "report":
@@ -86,6 +89,17 @@ export default function Home() {
         onViewMachineMemory={handleViewMachineMemory}
       />
       <main className="flex-1 p-8 bg-gray-50">{renderContent()}</main>
+
+      {/* Before/After Memory Modal */}
+      {showBeforeAfter && (
+        <BeforeAfterMemory
+          onClose={() => setShowBeforeAfter(false)}
+          onViewMachineMemory={(machineId) => {
+            setShowBeforeAfter(false);
+            handleViewMachineMemory(machineId);
+          }}
+        />
+      )}
     </div>
   );
 }

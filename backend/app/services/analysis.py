@@ -124,6 +124,51 @@ class AnalysisService:
             memory_trace=trace,
         )
 
+    async def memory_impact(self, incident_data: IncidentCreate) -> Dict[str, Any]:
+        """
+        Dry run (nothing is stored, no LLM): the deterministic recommendation
+        this incident would get with no memory versus with Hindsight recall.
+        """
+
+        incident = Incident(incident_id="PREVIEW", **incident_data.model_dump())
+        recalled, trace = await self.memory.search_similar_incidents(incident_data)
+        evidence = select_evidence(incident_data, recalled)
+
+        without = self.recommender.generate_recommendation(incident, [])
+        with_memory = self.recommender.generate_recommendation(incident, evidence)
+
+        history = await self.memory.get_machine_history(incident_data.machine_id)
+        same_problem = sorted(
+            (i for i in history if i.defect_type == incident_data.defect_type),
+            key=lambda x: x.timestamp,
+        )
+        not_working = [
+            i for i in same_problem
+            if i.action_outcome in (ActionOutcome.FAILED, ActionOutcome.PARTIAL)
+        ]
+
+        return {
+            "without_memory": without,
+            "with_memory": with_memory,
+            "evidence_incidents": [h.incident.incident_id for h in evidence],
+            "memory_trace": {**trace, "evidence_incidents": len(evidence)},
+            "trial_and_error": {
+                "attempts_that_did_not_work": len(not_working),
+                "downtime_minutes": sum(i.downtime_minutes or 0 for i in not_working),
+                "incident_ids": [i.incident_id for i in not_working],
+            },
+            "machine_history": [
+                {
+                    "incident_id": i.incident_id,
+                    "timestamp": i.timestamp.isoformat(),
+                    "intervention_category": i.intervention_category,
+                    "action_outcome": i.action_outcome.value if i.action_outcome else None,
+                    "downtime_minutes": i.downtime_minutes,
+                }
+                for i in same_problem
+            ],
+        }
+
     @staticmethod
     def _explain(incident: Incident, trace: Dict[str, Any], evidence: List[HistoricalIncident]) -> str:
         label = FLEET.get(incident.machine_type, {}).get("label", incident.machine_type)

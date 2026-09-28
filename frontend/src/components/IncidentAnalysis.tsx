@@ -27,6 +27,9 @@ import {
   Search,
   HelpCircle,
   MinusCircle,
+  Brain,
+  Target,
+  Zap,
 } from "lucide-react";
 
 interface Props {
@@ -134,6 +137,10 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
           {current_incident.machine_id} memory
         </button>
       </div>
+
+      {/* Pipeline panel + memory moment */}
+      <PipelineDebug result={result} />
+      <MemoryMoment result={result} />
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* ---------------- Left: what happened, recommendation, outcome ---------------- */}
@@ -599,6 +606,111 @@ function HistoryCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function MemoryMoment({ result }: { result: AnalysisResult }) {
+  const { historical_incidents, successful_interventions, failed_interventions, partial_interventions, current_incident } = result;
+  const count = historical_incidents.length;
+
+  if (count === 0) {
+    return (
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-6">
+        <div className="flex items-center gap-4">
+          <div className="p-4 bg-gray-200 rounded-full">
+            <Search className="w-8 h-8 text-gray-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-700">No Relevant History Found</h3>
+            <p className="text-gray-500 mt-1">
+              Hindsight recalled {result.memory_trace.incidents_recalled ?? 0} work orders for this machine type, but none
+              describes this problem with a recorded outcome. TRACE will not guess an action; record the outcome to start
+              building memory.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const sameMachine = historical_incidents.filter((h) => h.incident.machine_id === current_incident.machine_id).length;
+  const top = historical_incidents.reduce((m, h) => Math.max(m, h.similarity_score), 0);
+
+  return (
+    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+      <div className="flex items-start gap-4">
+        <div className="p-4 bg-green-100 rounded-full">
+          <Brain className="w-8 h-8 text-green-600" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-xl font-bold text-green-800">
+            TRACE Found {count} Related Historical Incident{count !== 1 ? "s" : ""}
+            {sameMachine > 0 && (
+              <span className="text-base font-medium text-green-700"> ({sameMachine} on {current_incident.machine_id})</span>
+            )}
+          </h3>
+          <div className="flex flex-wrap gap-4 mt-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span className="text-green-700 font-medium">{successful_interventions.length} worked</span>
+            </div>
+            {failed_interventions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-500" />
+                <span className="text-red-600 font-medium">{failed_interventions.length} failed</span>
+              </div>
+            )}
+            {partial_interventions.length > 0 && (
+              <div className="flex items-center gap-2">
+                <MinusCircle className="w-5 h-5 text-amber-500" />
+                <span className="text-amber-700 font-medium">{partial_interventions.length} partially worked</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-blue-500" />
+              <span className="text-blue-600 font-medium">{Math.round(top * 100)}% top similarity</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PipelineDebug({ result }: { result: AnalysisResult }) {
+  const { memory_trace: trace, recommendation } = result;
+  return (
+    <div className="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <Zap className="w-4 h-4 text-yellow-400" />
+        <span className="text-yellow-400 font-semibold">TRACE PIPELINE</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+        <PipelineStep label="Hindsight recall (fleet + this machine)" value={`${trace.memory_facts_recalled ?? 0} facts`} status="success" />
+        <PipelineStep label="Past work orders recalled" value={`${trace.incidents_recalled ?? 0}`} />
+        <PipelineStep label="Relevance gate: kept as evidence" value={`${trace.evidence_incidents ?? 0}`} />
+        <PipelineStep label="SQLite cross-reference" status="success" />
+        <PipelineStep label="Deterministic scoring" value={recommendation.intervention_category ?? "no evidence-backed action"} status="success" />
+        <PipelineStep label="Confidence" value={recommendation.confidence} />
+        <PipelineStep
+          label="LLM phrasing (wording only)"
+          value={recommendation.reasoning_source === "llm" ? "applied" : "fallback: rule-based"}
+          status={recommendation.reasoning_source === "llm" ? "success" : "skipped"}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PipelineStep({ label, status, value }: { label: string; status?: "success" | "skipped"; value?: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      {status === "success" && <span className="text-green-400">✓</span>}
+      {status === "skipped" && <span className="text-gray-500">○</span>}
+      {!status && <span className="text-gray-500">·</span>}
+      <span className="text-gray-400">{label}</span>
+      {value && <span className="text-white ml-auto truncate max-w-[50%]" title={value}>{value}</span>}
     </div>
   );
 }

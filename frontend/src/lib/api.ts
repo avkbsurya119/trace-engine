@@ -10,6 +10,7 @@ import type {
   DashboardStats,
   MachineMemory,
   Fleet,
+  HeroMachine,
 } from "@/types/incident";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -78,6 +79,12 @@ export const api = {
    * Machine types, machines, defect types and intervention categories
    */
   getFleet: (): Promise<Fleet> => fetchAPI<Fleet>("/dashboard/fleet"),
+
+  /**
+   * Showcase machines with a live with/without-memory comparison
+   */
+  getHeroMachines: (): Promise<{ hero_machines: HeroMachine[] }> =>
+    fetchAPI("/dashboard/hero-machines"),
 
   /**
    * Health check

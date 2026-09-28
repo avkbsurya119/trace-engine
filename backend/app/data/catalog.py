@@ -1065,7 +1065,61 @@ def fleet_summary() -> Dict[str, Any]:
                     for name, d in spec["defects"].items()
                 ],
                 "intervention_categories": sorted(spec["interventions"].keys()),
+                "hero_machine_id": next(
+                    (h["incident"]["machine_id"] for h in HERO_MACHINES
+                     if h["incident"]["machine_type"] == machine_type),
+                    None,
+                ),
             }
             for machine_type, spec in FLEET.items()
         ]
     }
+
+
+# Showcase machines for the "memory impact" (before / after) view. Each has a
+# real chain in the generated history (see generator.STORIES); the comparison
+# itself is computed live from Hindsight recall + deterministic scoring.
+HERO_MACHINES: List[Dict[str, Any]] = [
+    {
+        "key": "cnc",
+        "title": "CNC spindle vibration",
+        "story": "Alignment failed, bearing replacement fixed it, and the fault came back 7 months later.",
+        "incident": {
+            "machine_id": "CNC-204",
+            "machine_type": "CNC_Machining_Center",
+            "production_line": "Machining Cell 2",
+            "defect_type": "spindle_vibration",
+            "symptoms": ["high spindle vibration", "audible spindle noise", "spindle temperature rising"],
+            "sensor_values": {"spindle_vibration_mm_s": 8.4, "spindle_temp_c": 47.5, "spindle_speed_rpm": 12000},
+            "description": "Spindle noise at high speed and vibration alarm at 12000 rpm; chatter on finishing pass of 6061 housings.",
+        },
+    },
+    {
+        "key": "press",
+        "title": "Press pressure loss",
+        "story": "Same symptom twice, a different root cause each time; one repair was wasted on the wrong cause.",
+        "incident": {
+            "machine_id": "HP-303",
+            "machine_type": "Hydraulic_Press",
+            "production_line": "Press Shop A",
+            "defect_type": "pressure_loss",
+            "symptoms": ["press not reaching tonnage", "pressure drops during hold"],
+            "sensor_values": {"system_pressure_bar": 172, "oil_temp_c": 57.2},
+            "description": "Press only reaching 172 bar against 200 bar setpoint, pressure decays during dwell on DC04 panels.",
+        },
+    },
+    {
+        "key": "conveyor",
+        "title": "Conveyor belt mistracking",
+        "story": "A quick re-tracking only masked it; idler replacement three weeks later fixed it.",
+        "incident": {
+            "machine_id": "CV-507",
+            "machine_type": "Belt_Conveyor",
+            "production_line": "Packing",
+            "defect_type": "belt_mistracking",
+            "symptoms": ["belt running off to one side", "belt edge fraying"],
+            "sensor_values": {"tracking_offset_mm": 21, "belt_speed_m_s": 1.4},
+            "description": "Belt tracking 21 mm to the drive side again, edge fraying near the tail.",
+        },
+    },
+]

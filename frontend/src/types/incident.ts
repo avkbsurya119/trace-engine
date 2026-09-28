@@ -148,6 +148,7 @@ export interface FleetMachineType {
   machines: { machine_id: string; production_line: string; model: string }[];
   defect_types: { defect_type: string; symptoms: string[] }[];
   intervention_categories: string[];
+  hero_machine_id?: string | null;
 }
 
 export interface Fleet {
@@ -193,4 +194,27 @@ export interface MachineMemory {
   total_downtime_hours?: number;
   outcome_distribution?: Partial<Record<ActionOutcome, number>>;
   timeline?: MachineTimelineEntry[];
+}
+
+export interface HeroMachine {
+  key: string;
+  title: string;
+  story: string;
+  incident: IncidentCreate;
+  without_memory: Recommendation;
+  with_memory: Recommendation;
+  evidence_incidents: string[];
+  memory_trace: MemoryTrace;
+  trial_and_error: {
+    attempts_that_did_not_work: number;
+    downtime_minutes: number;
+    incident_ids: string[];
+  };
+  machine_history: {
+    incident_id: string;
+    timestamp: string;
+    intervention_category?: string;
+    action_outcome?: ActionOutcome;
+    downtime_minutes?: number;
+  }[];
 }
