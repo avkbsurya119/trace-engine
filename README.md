@@ -104,7 +104,7 @@ Three showcase machines have scripted chains in the history (`generator.STORIES`
 | **HP-303** | Pressure loss | Relief valve adjustment PARTIAL → pump replacement FAILED → cylinder reseal SUCCESS; a year later reseal FAILED (different cause) → relief valve replacement SUCCESS |
 | **CV-507** | Belt mistracking | Tracking adjustment PARTIAL (temporary) → idler replacement SUCCESS |
 
-The dashboard's **See Memory Impact** modal (`BeforeAfterMemory.tsx`, `GET /api/dashboard/hero-machines`) runs each hero incident live through the same deterministic scorer twice — once with no evidence, once with Hindsight recall — and shows what trial and error actually cost that machine (attempts that didn't work and their downtime, from SQLite). Nothing in the modal is hardcoded and nothing is stored.
+The **With vs without memory** comparison on TRACE Intelligence (`BeforeAfterMemory.tsx`, `GET /api/dashboard/hero-machines`) runs each hero incident live through the same deterministic scorer twice — once with no evidence, once with Hindsight recall — and shows what trial and error actually cost that machine (attempts that didn't work and their downtime, from SQLite). Nothing in the modal is hardcoded and nothing is stored.
 
 ## TRACE Intelligence
 
@@ -201,25 +201,25 @@ Interactive docs: `http://localhost:8000/docs`.
 
 ## Frontend
 
-Built to make memory visible and every decision explainable.
+Each page answers one question, shown as its eyebrow and in the sidebar:
 
-- **Dashboard**
-  - **Demo guide**: the three-minute story as five steps, one click each (memory impact → load demo incident 1 → record the outcome → load demo incident 2 → open machine memory). Presets come from the backend catalog.
-  - **Knowledge growth**: cumulative recorded outcomes per month (hover for the month's numbers; screen-reader table included).
-  - Memory health banner, key metrics, outcome and problem distributions, fleet cards (open each type's hero machine), provenance line (synthetic data, bank name).
-  - **See Memory Impact**: live with/without-memory comparison for CNC-204, HP-303, CV-507, including what trial and error actually cost each machine.
-- **Report Incident** — built from `/api/dashboard/fleet` (machine type → machine → problem → symptoms), with a *Load a demo incident* picker. While analysis runs, a **retrieval progress** panel names the real pipeline stages (machine history → fleet → ranking → filtering → scoring → saving → explanation). It advances on elapsed time only and never delays the result.
-- **Incident Analysis**, in the order a reviewer asks questions:
-  1. **Decision summary**: the recommended intervention, a confidence meter with the real sample ("4 of 7 recorded attempts worked"), the computed basis, and what memory contributed (work orders recalled, kept as evidence, from this machine). With no reliable evidence it shows **Recommendation intentionally withheld**: what was searched (this machine's history, the fleet), why nothing qualified, and what to do next.
-  2. **How TRACE reached this decision**: an interactive pipeline (Incident → Memory retrieval → Filtering → Scoring → Confidence → Recommendation → Groq explanation); each stage expands to the numbers it produced, including tag filters and the query sent to memory.
-  3. **What happened**.
-  4. **Why this recommendation**: the confidence checklist (each rule met or not), every intervention in the evidence with worked / partial / failed / unverified counts, a score bar and the reason it was or wasn't chosen, cautions, and the AI-written summary in a separate dashed box.
-  5. **What TRACE remembered**: evidence cards grouped by outcome with *this machine* and recency tags and the text recalled from Hindsight, plus recurring-pattern and cross-machine summaries.
-  6. **Record outcome**, followed by **Memory grew**: recorded outcomes for this problem on this machine before → after, and the fleet total.
-- **Machine Memory** — outcome counts, recurring defects, what has / hasn't worked, intervention chart, and a timeline with **problem filters** and chain markers (*Follow-up: previous attempt didn't work*, *Came back after a fix*).
-- **Sidebar** — live status of Hindsight, SQLite and the LLM from `/health`; shows the real reason when memory calls fail.
+| Page | Question | What it shows |
+|---|---|---|
+| **Dashboard** | What is happening? | Work orders, machines, repairs that worked, downtime logged, outcome mix, most frequent problems, fleet by equipment type |
+| **Report Incident** | What happened? | Form built from `/api/dashboard/fleet` (type → machine → problem → symptoms). While analysis runs, a retrieval progress panel names the real pipeline stages |
+| **Incident Analysis** | What should I do? | Decision summary (or *recommendation intentionally withheld*), an interactive decision pipeline, why this recommendation (confidence checklist, why each alternative lost, cautions), the AI-written summary in a separate box, what TRACE remembered, and record outcome → *memory grew* |
+| **Machine Memory** | What happened before? | Machine picker (grouped by type, filterable), then one machine's stats, full timeline with problem filters and repair-chain markers, what has / hasn't worked |
+| **TRACE Intelligence** | What has TRACE learned? | Everything in [TRACE Intelligence](#trace-intelligence), plus **With vs without memory**: a live comparison for the showcase machines |
 
-Accessibility: dialog semantics, Esc and focus return for the modal, labelled icon buttons, `aria-expanded` / `aria-pressed` / tab roles, table captions, visible keyboard focus, reduced-motion support. The fleet catalog and the hero comparison are cached per page session to avoid duplicate calls.
+**Judge mode** (sidebar button, or `?judge=1`) is a presentation layer for a 5-minute demo. A presenter bar walks the story one click per step (arrow keys work too): dashboard → with vs without memory → a new problem → the same problem again → machine history → what TRACE learned. The demo incidents come from the backend catalog. It hides operator/developer controls such as the demo-incident picker, refresh buttons and detailed system status, and adds no data or logic.
+
+**Consistency:** shared primitives in `components/ui.tsx` (`PageHeader`, `Section`, `StatTile`, `LoadingState`, `EmptyState`, `ErrorState`, `ConfidenceMeter`, one card and button style). Loading states say what is happening, empty states say what will appear and how, and errors explain what failed with a retry, never a raw status code.
+
+**Motion:** a short fade between pages, count-up numbers, confidence meters and outcome bars that fill in, staggered timeline entries, and hover elevation on clickable cards. Everything respects `prefers-reduced-motion`.
+
+**Accessibility:** a skip link, one `h1` per page with focus moved to it on navigation, breadcrumbs, `aria-current` in the sidebar, dialog semantics with Esc and focus return for the modal, labelled icon buttons, `aria-expanded` / `aria-pressed`, table captions, text alternatives for every chart, and visible keyboard focus.
+
+The fleet catalog, the with/without-memory comparison and the Intelligence report are cached per page session; heavy visuals load lazily.
 
 ## Testing
 
@@ -269,10 +269,10 @@ python -m scripts.audit_data --recommendations
 See [DEMO.md](DEMO.md) for the full script.
 
 1. `python -m scripts.demo --reset` so AC-407 has no history.
-2. Dashboard → **Demo guide** → *See memory impact*: CNC-204 / HP-303 / CV-507 with and without memory, and what trial and error cost each machine.
-3. *Load incident 1* → Analyze. The retrieval panel runs; the result is **Recommendation intentionally withheld**, showing what was searched and why nothing qualified.
+2. Turn on **Judge mode** (sidebar) and use *Next*. Step 2 opens TRACE Intelligence with the live **with vs without memory** comparison for CNC-204 / HP-303 / CV-507, including what trial and error cost each machine.
+3. Step 3 loads incident 1 → Analyze. The retrieval panel runs; the result is **Recommendation intentionally withheld**, showing what was searched and why nothing qualified.
 4. Record outcome: *Condensate drain replacement*, SUCCESS → **Memory grew 0 → 1**.
-5. *Load incident 2* → Analyze → TRACE recalls incident 1 (tagged *this machine*, *Recent*), recommends it at **LOW** confidence ("1 of 1 recorded attempt worked"), the checklist shows why it is not higher, and the AI summary cites incident 1's ID.
+5. Step 4 loads incident 2 → Analyze → TRACE recalls incident 1 (tagged *this machine*, *Recent*), recommends it at **LOW** confidence ("1 of 1 recorded attempt worked"), the checklist shows why it is not higher, and the AI summary cites incident 1's ID.
 6. Open **AC-407 memory**, or CNC-204 filtered to *Spindle vibration* to show a failed → fixed → came back chain.
 
 ## Tech stack

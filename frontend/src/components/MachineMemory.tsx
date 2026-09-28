@@ -1,86 +1,118 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { cn, formatDay, formatHours, getOutcomeBgColor, humanize } from "@/lib/utils";
-import type { MachineMemory as MachineMemoryType, MachineTimelineEntry } from "@/types/incident";
+import type { Fleet, MachineMemory as MachineMemoryType, MachineTimelineEntry } from "@/types/incident";
 import {
-  ArrowLeft,
-  Database,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  TrendingUp,
   Activity,
-  Loader2,
+  AlertTriangle,
   BarChart3,
   Calendar,
+  CheckCircle,
+  Clock,
+  Database,
+  Plus,
+  Search,
+  XCircle,
   Zap,
 } from "lucide-react";
+import {
+  BUTTON_PRIMARY,
+  BUTTON_SECONDARY,
+  CARD,
+  CARD_INTERACTIVE,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+  Section,
+  StatTile,
+} from "@/components/ui";
 
 interface Props {
   machineId: string;
+  onSelectMachine: (machineId: string) => void;
+  onReportIncident: () => void;
   onBack: () => void;
 }
 
-export function MachineMemory({ machineId, onBack }: Props) {
+/** "What happened before?" One machine's full maintenance history, from SQLite. */
+export function MachineMemory({ machineId, onSelectMachine, onReportIncident, onBack }: Props) {
   const [memory, setMemory] = useState<MachineMemoryType | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchMemory() {
-      setLoading(true);
-      setError(null);
-      setMemory(null);
-      if (!machineId) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const data = await api.getMachineMemory(machineId);
-        setMemory(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchMemory();
+  const load = useCallback(() => {
+    if (!machineId) return;
+    setError(null);
+    setMemory(null);
+    api
+      .getMachineMemory(machineId)
+      .then(setMemory)
+      .catch((e) => setError(e instanceof Error ? e.message : "The backend did not respond."));
   }, [machineId]);
 
-  if (loading) {
+  useEffect(() => load(), [load]);
+
+  const breadcrumb = [{ label: "Machine Memory", onClick: machineId ? () => onSelectMachine("") : undefined }, ...(machineId ? [{ label: machineId }] : [])];
+
+  if (!machineId) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-industrial-600" />
+      <div className="space-y-6">
+        <PageHeader question="What happened before?" title="Machine Memory" subtitle="Every work order on one machine: what was wrong, what was tried, and whether it worked." />
+        <MachinePicker onSelect={onSelectMachine} />
       </div>
     );
   }
+
+  const header = (
+    <PageHeader
+      question="What happened before?"
+      title={machineId}
+      breadcrumb={breadcrumb}
+      subtitle={memory && (memory.model || memory.production_line) ? [memory.model, memory.production_line].filter(Boolean).join(" · ") : undefined}
+      actions={
+        <button type="button" onClick={onBack} className={BUTTON_SECONDARY}>
+          Dashboard
+        </button>
+      }
+    />
+  );
 
   if (error) {
     return (
       <div className="space-y-6">
-        <Header machineId={machineId} onBack={onBack} />
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-          {error}
-        </div>
+        {header}
+        <ErrorState title={`Could not load the history of ${machineId}`} detail={error} onRetry={load} />
       </div>
     );
   }
 
-  if (!machineId || !memory || memory.message || memory.total_incidents === 0) {
+  if (!memory) {
     return (
       <div className="space-y-6">
-        <Header machineId={machineId} onBack={onBack} />
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-          <Database className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600">
-            {memory?.message || "No incident history for this machine yet."}
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Report an incident to start building this machine&apos;s memory.
-          </p>
-        </div>
+        {header}
+        <LoadingState label={`Reading ${machineId}'s maintenance history…`} />
+      </div>
+    );
+  }
+
+  if (memory.total_incidents === 0) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <EmptyState
+          icon={<Database className="w-6 h-6" />}
+          title={`No work orders for ${machineId} yet`}
+          action={
+            <button type="button" onClick={onReportIncident} className={BUTTON_PRIMARY}>
+              <Plus className="w-4 h-4" aria-hidden /> Report an incident
+            </button>
+          }
+        >
+          When an incident on this machine is reported and its outcome recorded, it appears here, and TRACE recalls it the next time
+          the machine has a similar problem.
+        </EmptyState>
       </div>
     );
   }
@@ -89,188 +121,125 @@ export function MachineMemory({ machineId, onBack }: Props) {
 
   return (
     <div className="space-y-6">
-      <Header machineId={machineId} onBack={onBack} />
+      {header}
 
-      {/* Machine Health Summary */}
-      <div className="bg-gradient-to-r from-industrial-50 to-blue-50 border border-industrial-200 rounded-xl p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-white rounded-lg shadow-sm">
-            <Database className="w-8 h-8 text-industrial-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-industrial-900">{machineId}</h3>
-            {(memory.model || memory.production_line) && (
-              <p className="text-sm text-industrial-600">
-                {[memory.model, memory.production_line].filter(Boolean).join(" · ")}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-4 mt-2 text-sm">
-              <span className="text-industrial-700">
-                <strong>{memory.total_incidents}</strong> incidents
-              </span>
-              <span className="text-industrial-700">
-                <strong>{memory.recurring_defects?.length || 0}</strong> defect types
-              </span>
-              <span className="text-industrial-700">
-                <strong>{successRate}%</strong> of attempts worked
-              </span>
-              <span className="text-industrial-700">
-                <strong>{memory.total_downtime_hours ?? 0} h</strong> downtime logged
-              </span>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatTile label="Work orders" value={memory.total_incidents} sub={`${memory.recurring_defects?.length ?? 0} different problems`} icon={<Activity className="w-5 h-5" />} />
+        <StatTile label="Repairs that worked" value={memory.outcome_distribution?.SUCCESS ?? 0} sub={`${successRate}% of verified attempts`} icon={<CheckCircle className="w-5 h-5" />} tone="good" />
+        <StatTile label="Failed attempts" value={memory.outcome_distribution?.FAILED ?? 0} sub={`${memory.outcome_distribution?.PARTIAL ?? 0} partial`} icon={<XCircle className="w-5 h-5" />} tone="bad" />
+        <StatTile label="Downtime logged" value={`${memory.total_downtime_hours ?? 0} h`} sub="Across this machine's work orders" icon={<Clock className="w-5 h-5" />} tone="warn" />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard
-          icon={<Activity className="w-6 h-6 text-industrial-600" />}
-          label="Total Incidents"
-          value={memory.total_incidents || 0}
-          bgColor="bg-industrial-50"
-        />
-        <StatCard
-          icon={<CheckCircle className="w-6 h-6 text-green-600" />}
-          label="Repairs That Worked"
-          value={memory.outcome_distribution?.SUCCESS ?? 0}
-          bgColor="bg-green-50"
-        />
-        <StatCard
-          icon={<XCircle className="w-6 h-6 text-red-600" />}
-          label="Failed Attempts"
-          value={memory.outcome_distribution?.FAILED ?? 0}
-          bgColor="bg-red-50"
-        />
-        <StatCard
-          icon={<TrendingUp className="w-6 h-6 text-blue-600" />}
-          label="Attempts That Worked"
-          value={`${successRate}%`}
-          bgColor="bg-blue-50"
-        />
-      </div>
+      <Section
+        icon={<Calendar className="w-5 h-5 text-industrial-600" />}
+        title="Maintenance timeline"
+        id="timeline"
+        aside={<span className="text-xs text-gray-500">Newest first · from the work-order record</span>}
+      >
+        <MemoryTimeline incidents={memory.timeline || []} />
+      </Section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recurring Defects */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            <h3 className="text-lg font-semibold text-industrial-900">
-              Recurring Defects
-            </h3>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Section icon={<CheckCircle className="w-5 h-5 text-green-600" />} title="What has worked" id="worked">
+          <InterventionList interventions={memory.successful_interventions || {}} type="success" />
+        </Section>
+        <Section icon={<XCircle className="w-5 h-5 text-red-600" />} title="What hasn't worked" id="failed">
+          <InterventionList interventions={memory.failed_interventions || {}} type="failed" />
+        </Section>
+        <Section icon={<AlertTriangle className="w-5 h-5 text-amber-500" />} title="Recurring problems" id="recurring">
           {memory.recurring_defects && memory.recurring_defects.length > 0 ? (
             <div className="space-y-3">
               {memory.recurring_defects.map(([defect, count]) => (
-                <DefectBar
-                  key={defect}
-                  defect={defect}
-                  count={count}
-                  total={memory.total_incidents || 1}
-                />
+                <DefectBar key={defect} defect={defect} count={count} total={memory.total_incidents || 1} />
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-sm">No recurring defects.</p>
+            <p className="text-gray-500 text-sm">No recurring problems.</p>
           )}
-        </div>
-
-        {/* What Worked */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle className="w-5 h-5 text-green-500" />
-            <h3 className="text-lg font-semibold text-industrial-900">
-              What Has Worked
-            </h3>
-          </div>
-          <InterventionList
-            interventions={memory.successful_interventions || {}}
-            type="success"
-          />
-        </div>
-
-        {/* What Didn't Work */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <XCircle className="w-5 h-5 text-red-500" />
-            <h3 className="text-lg font-semibold text-industrial-900">
-              What Hasn&apos;t Worked
-            </h3>
-          </div>
-          <InterventionList
-            interventions={memory.failed_interventions || {}}
-            type="failed"
-          />
-        </div>
+        </Section>
       </div>
 
-      {/* Memory Timeline */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Calendar className="w-5 h-5 text-industrial-600" />
-          <h3 className="text-lg font-semibold text-industrial-900">Memory Timeline</h3>
-          <span className="ml-auto text-xs text-gray-500">Newest first · from the work-order record</span>
-        </div>
-        <MemoryTimeline incidents={memory.timeline || []} />
-      </div>
-
-      {/* Intervention Chart */}
-      {(Object.keys(memory.successful_interventions || {}).length > 0 ||
-        Object.keys(memory.failed_interventions || {}).length > 0) && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-5 h-5 text-industrial-600" />
-            <h3 className="text-lg font-semibold text-industrial-900">
-              Historical Interventions
-            </h3>
-          </div>
-          <InterventionChart
-            successful={memory.successful_interventions || {}}
-            failed={memory.failed_interventions || {}}
-          />
-        </div>
+      {(Object.keys(memory.successful_interventions || {}).length > 0 || Object.keys(memory.failed_interventions || {}).length > 0) && (
+        <Section icon={<BarChart3 className="w-5 h-5 text-industrial-600" />} title="Interventions on this machine" id="interventions">
+          <InterventionChart successful={memory.successful_interventions || {}} failed={memory.failed_interventions || {}} />
+        </Section>
       )}
     </div>
   );
 }
 
-function Header({ machineId, onBack }: { machineId: string; onBack: () => void }) {
-  return (
-    <div className="flex items-center gap-4">
-      <button
-        onClick={onBack}
-        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-      >
-        <ArrowLeft className="w-5 h-5" />
-      </button>
-      <div>
-        <h2 className="text-2xl font-bold text-industrial-900">Machine Memory</h2>
-        <p className="text-industrial-600">{machineId || "Select a machine"}</p>
-      </div>
-    </div>
-  );
-}
+/** Choose a machine: grouped by equipment type, filterable, from the fleet catalog. */
+function MachinePicker({ onSelect }: { onSelect: (machineId: string) => void }) {
+  const [fleet, setFleet] = useState<Fleet | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
-function StatCard({
-  icon,
-  label,
-  value,
-  bgColor,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number | string;
-  bgColor: string;
-}) {
+  const load = useCallback(() => {
+    setError(null);
+    api
+      .getFleet()
+      .then(setFleet)
+      .catch((e) => setError(e instanceof Error ? e.message : "The backend did not respond."));
+  }, []);
+  useEffect(() => load(), [load]);
+
+  const q = query.trim().toUpperCase();
+  const groups = useMemo(
+    () =>
+      (fleet?.machine_types ?? [])
+        .map((t) => ({ ...t, machines: t.machines.filter((m) => !q || m.machine_id.includes(q) || m.production_line.toUpperCase().includes(q)) }))
+        .filter((t) => t.machines.length > 0),
+    [fleet, q]
+  );
+
+  if (error) return <ErrorState title="Could not load the machine list" detail={error} onRetry={load} />;
+  if (!fleet) return <LoadingState label="Loading machines…" />;
+
   return (
-    <div className={cn("rounded-lg p-4", bgColor)}>
-      <div className="flex items-center gap-3">
-        {icon}
-        <div>
-          <p className="text-sm text-gray-600">{label}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+    <div className={cn(CARD, "p-6 space-y-5")}>
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (q) onSelect(groups[0]?.machines[0]?.machine_id ?? q);
+        }}
+        className="relative max-w-sm"
+      >
+        <label htmlFor="machine-search" className="sr-only">
+          Find a machine
+        </label>
+        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+        <input
+          id="machine-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Find a machine, e.g. cnc-204"
+          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+        />
+      </form>
+      {groups.length === 0 && <p className="text-sm text-gray-500">No machine matches “{query}”.</p>}
+      {groups.map((type) => (
+        <div key={type.machine_type}>
+          <p className="text-xs uppercase tracking-wide font-semibold text-gray-500 mb-2">{humanize(type.label)}</p>
+          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {type.machines.map((m) => (
+              <li key={m.machine_id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(m.machine_id)}
+                  className={cn("w-full text-left rounded-lg border border-gray-200 px-3 py-2", CARD_INTERACTIVE)}
+                >
+                  <span className="block text-sm font-medium text-gray-900">
+                    {m.machine_id}
+                    {m.machine_id === type.hero_machine_id && <span className="ml-1 text-xs text-industrial-600">★ showcase</span>}
+                  </span>
+                  <span className="block text-xs text-gray-500 truncate">{m.production_line}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
+      ))}
     </div>
   );
 }
@@ -314,7 +283,11 @@ function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
       <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" aria-hidden />
       <ol className="space-y-3">
         {shown.map((incident, i) => (
-          <li key={incident.incident_id} className="relative pl-8">
+          <li
+            key={incident.incident_id}
+            className="relative pl-8 animate-fade-in"
+            style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
+          >
             <div
               className={cn(
                 "absolute left-0 top-1 w-6 h-6 rounded-full flex items-center justify-center",

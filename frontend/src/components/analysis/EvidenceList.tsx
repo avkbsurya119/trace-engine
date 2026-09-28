@@ -103,7 +103,7 @@ function HistoryCard({
   const panelId = `evidence-${incident.incident_id}`;
 
   return (
-    <div className={cn("border rounded-lg overflow-hidden", sameMachine ? "border-industrial-300" : "border-gray-200")}>
+    <div className={cn("border rounded-lg overflow-hidden transition-shadow duration-150 hover:shadow-md", sameMachine ? "border-industrial-300" : "border-gray-200")}>
       <button
         type="button"
         onClick={onToggle}
