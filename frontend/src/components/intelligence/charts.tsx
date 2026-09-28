@@ -111,7 +111,7 @@ export function MonthlyLine({
       </svg>
       {hover != null && (
         <div
-          className="pointer-events-none absolute top-0 -translate-x-1/2 rounded bg-gray-900 text-white text-xs px-2 py-1 whitespace-nowrap"
+          className="pointer-events-none absolute top-0 -translate-x-1/2 rounded bg-slate-800 text-white text-xs px-2 py-1 whitespace-nowrap border border-white/10"
           style={{ left: `${(x(hover) / W) * 100}%` }}
         >
           {formatMonth(months[hover], true)}: <strong>{format(values[hover])}</strong>
@@ -154,17 +154,17 @@ export function BarRow({
   sub?: React.ReactNode;
   tone?: "ink" | "good" | "bad";
 }) {
-  const fill = tone === "good" ? "bg-green-600" : tone === "bad" ? "bg-red-500" : "bg-industrial-500";
+  const fill = tone === "good" ? "bg-green-500" : tone === "bad" ? "bg-red-500" : "bg-[#38bdf8]";
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="text-gray-800 truncate">{label}</span>
-        <span className="text-gray-900 font-medium tabular-nums flex-shrink-0">{display ?? value.toLocaleString()}</span>
+        <span className="text-slate-300 truncate">{label}</span>
+        <span className="text-white font-medium tabular-nums flex-shrink-0">{display ?? value.toLocaleString()}</span>
       </div>
-      <div className="h-1.5 bg-gray-100 rounded-full mt-1" aria-hidden>
+      <div className="h-1.5 bg-slate-700/50 rounded-full mt-1" aria-hidden>
         <div className={cn("h-full rounded-full", fill)} style={{ width: `${max ? Math.max(2, (value / max) * 100) : 0}%` }} />
       </div>
-      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
     </div>
   );
 }

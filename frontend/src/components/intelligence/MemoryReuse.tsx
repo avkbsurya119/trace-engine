@@ -20,26 +20,26 @@ export function MemoryReuse({ reuse }: { reuse: MemoryReuseData }) {
   ];
 
   return (
-    <Section icon={<Repeat className="w-5 h-5 text-industrial-600" />} title="Memory reuse" id="reuse">
-      <p className="text-sm text-gray-600 -mt-2 mb-4">
+    <Section icon={<Repeat className="w-5 h-5 text-[#38bdf8]" />} title="Memory reuse" id="reuse">
+      <p className="text-sm text-slate-400 -mt-2 mb-4">
         Replay of all {reuse.work_orders.toLocaleString()} work orders: what memory already held when each one was reported. Recall is
         not logged per request, so this measures what was available, not what someone clicked.
       </p>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Share of work orders</p>
+          <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold">Share of work orders</p>
           {shares.map((s) => (
             <BarRow key={s.label} label={s.label} value={s.value} max={total} display={`${formatPercent(s.value / total)} · ${s.value}`} />
           ))}
         </div>
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Repairs memory recommended most often</p>
+          <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold">Repairs memory recommended most often</p>
           {reuse.most_recommended_repairs.map((r) => (
             <BarRow key={r.intervention_category} label={r.intervention_category} value={r.times} max={topRepair} display={`${r.times}×`} />
           ))}
         </div>
         <div className="space-y-3">
-          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Past work orders cited most as evidence</p>
+          <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold">Past work orders cited most as evidence</p>
           {reuse.most_cited_work_orders.map((w) => (
             <BarRow
               key={w.incident_id}

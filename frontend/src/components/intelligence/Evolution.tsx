@@ -39,8 +39,8 @@ export function KnowledgeEvolution({ points, problemsCatalogued }: { points: Evo
   ];
 
   return (
-    <Section icon={<TrendingUp className="w-5 h-5 text-industrial-600" />} title="Knowledge evolution" id="evolution">
-      <p className="text-sm text-gray-600 -mt-2 mb-4">
+    <Section icon={<TrendingUp className="w-5 h-5 text-[#38bdf8]" />} title="Knowledge evolution" id="evolution">
+      <p className="text-sm text-slate-400 -mt-2 mb-4">
         Replayed month by month: at each month end the recommendation engine re-scored every known problem using only the outcomes
         recorded so far. TRACE gets more capable as technicians record what worked.
       </p>
@@ -48,14 +48,14 @@ export function KnowledgeEvolution({ points, problemsCatalogued }: { points: Evo
         {panels.map((panel) => (
           <div key={panel.title}>
             <div className="flex items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-gray-900">{panel.title}</p>
-              <p className="text-xs text-gray-500">{panel.note}</p>
+              <p className="text-sm font-medium text-white">{panel.title}</p>
+              <p className="text-xs text-slate-400">{panel.note}</p>
             </div>
             <MonthlyLine months={months} values={panel.values} label={panel.title} format={panel.format} max={panel.max} height={130} />
           </div>
         ))}
       </div>
-      <p className="text-xs text-gray-500 mt-4">
+      <p className="text-xs text-slate-400 mt-4">
         Machines with history: {first.cumulative_machines} → {last.cumulative_machines}. Work orders added in the last month:{" "}
         {last.incidents} ({last.outcomes_recorded} with outcomes).
       </p>

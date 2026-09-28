@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Brain, Database, FileWarning, LayoutDashboard, Presentation, Sparkles } from "lucide-react";
+import { Brain, Database, FileWarning, LayoutDashboard, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { HealthStatus } from "@/types/incident";
@@ -12,8 +12,6 @@ interface SidebarProps {
   currentView: View;
   onNavigate: (view: View) => void;
   onViewMachineMemory?: (machineId: string) => void;
-  judgeMode: boolean;
-  onToggleJudgeMode: (on: boolean) => void;
 }
 
 /** Navigation in story order; each page answers one question. */
@@ -24,7 +22,7 @@ const NAV: { id: View; label: string; question: string; icon: typeof LayoutDashb
   { id: "intelligence", label: "TRACE Intelligence", question: "What has TRACE learned?", icon: Sparkles },
 ];
 
-export function Sidebar({ currentView, onNavigate, judgeMode, onToggleJudgeMode }: SidebarProps) {
+export function Sidebar({ currentView, onNavigate }: SidebarProps) {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [healthError, setHealthError] = useState(false);
 
@@ -46,13 +44,13 @@ export function Sidebar({ currentView, onNavigate, judgeMode, onToggleJudgeMode 
   const memoryState = healthError ? "down" : !health ? "pending" : health.checks.hindsight.ok ? "up" : "down";
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-industrial-900 text-white flex flex-col sticky top-0 h-screen">
-      <div className="p-6 border-b border-industrial-700">
+    <aside className="w-64 flex-shrink-0 bg-[#0a1628]/95 backdrop-blur-xl text-white flex flex-col sticky top-0 h-screen border-r border-white/10">
+      <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <Brain className="w-8 h-8 text-industrial-400" aria-hidden />
+          <Brain className="w-8 h-8 text-[#38bdf8]" aria-hidden />
           <div>
-            <p className="text-xl font-bold">TRACE</p>
-            <p className="text-xs text-industrial-400">Troubleshooting memory</p>
+            <p className="text-xl font-bold neon-text-blue">TRACE</p>
+            <p className="text-xs text-slate-400">Troubleshooting memory</p>
           </div>
         </div>
       </div>
@@ -69,14 +67,16 @@ export function Sidebar({ currentView, onNavigate, judgeMode, onToggleJudgeMode 
                   onClick={() => onNavigate(item.id)}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors",
-                    isActive ? "bg-industrial-700 text-white" : "text-industrial-300 hover:bg-industrial-800 hover:text-white"
+                    "w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-all",
+                    isActive
+                      ? "bg-[#38bdf8]/15 text-white border border-[#38bdf8]/30"
+                      : "text-slate-300 hover:bg-white/5 hover:text-white"
                   )}
                 >
-                  <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" aria-hidden />
+                  <Icon className={cn("w-5 h-5 mt-0.5 flex-shrink-0", isActive && "text-[#38bdf8]")} aria-hidden />
                   <span>
                     <span className="block text-sm font-medium">{item.label}</span>
-                    <span className={cn("block text-xs", isActive ? "text-industrial-200" : "text-industrial-500")}>{item.question}</span>
+                    <span className={cn("block text-xs", isActive ? "text-slate-300" : "text-slate-500")}>{item.question}</span>
                   </span>
                 </button>
               </li>
@@ -85,48 +85,33 @@ export function Sidebar({ currentView, onNavigate, judgeMode, onToggleJudgeMode 
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-industrial-700 space-y-3">
-        <button
-          type="button"
-          onClick={() => onToggleJudgeMode(!judgeMode)}
-          aria-pressed={judgeMode}
-          className={cn(
-            "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-            judgeMode ? "bg-white text-industrial-900 hover:bg-industrial-50" : "bg-industrial-800 text-industrial-200 hover:bg-industrial-700 hover:text-white"
-          )}
-        >
-          <Presentation className="w-4 h-4" aria-hidden />
-          {judgeMode ? "Exit judge mode" : "Judge mode"}
-        </button>
-
-        <div className="space-y-1" aria-label="System status">
-          <StatusLine
-            label={
-              healthError
-                ? "Backend unreachable"
-                : health?.checks.hindsight.ok
-                ? `Hindsight memory: ${health.checks.hindsight.bank}`
-                : health
-                ? "Hindsight unavailable"
-                : "Checking memory…"
-            }
-            state={memoryState}
-            title={health?.checks.hindsight.error}
-          />
-          {health && !judgeMode && (
-            <>
-              <StatusLine
-                label={`SQLite: ${health.checks.sqlite.incidents ?? "?"} work orders`}
-                state={health.checks.sqlite.ok ? "up" : "down"}
-                title={health.checks.sqlite.error}
-              />
-              <StatusLine
-                label={health.checks.llm.ok ? `LLM wording: ${health.checks.llm.model}` : "LLM off: rule-based wording"}
-                state={health.checks.llm.ok ? "up" : "pending"}
-              />
-            </>
-          )}
-        </div>
+      <div className="p-4 border-t border-white/10 space-y-1" aria-label="System status">
+        <StatusLine
+          label={
+            healthError
+              ? "Backend unreachable"
+              : health?.checks.hindsight.ok
+              ? `Hindsight memory: ${health.checks.hindsight.bank}`
+              : health
+              ? "Hindsight unavailable"
+              : "Checking memory…"
+          }
+          state={memoryState}
+          title={health?.checks.hindsight.error}
+        />
+        {health && (
+          <>
+            <StatusLine
+              label={`SQLite: ${health.checks.sqlite.incidents ?? "?"} work orders`}
+              state={health.checks.sqlite.ok ? "up" : "down"}
+              title={health.checks.sqlite.error}
+            />
+            <StatusLine
+              label={health.checks.llm.ok ? `LLM wording: ${health.checks.llm.model}` : "LLM off: rule-based wording"}
+              state={health.checks.llm.ok ? "up" : "pending"}
+            />
+          </>
+        )}
       </div>
     </aside>
   );
@@ -134,11 +119,11 @@ export function Sidebar({ currentView, onNavigate, judgeMode, onToggleJudgeMode 
 
 function StatusLine({ label, state, title }: { label: string; state: "up" | "down" | "pending"; title?: string }) {
   return (
-    <div className="flex items-center gap-2 text-industrial-400 text-xs" title={title}>
+    <div className="flex items-center gap-2 text-slate-400 text-xs" title={title}>
       <span
         className={cn(
           "w-2 h-2 rounded-full flex-shrink-0",
-          state === "up" ? "bg-green-500" : state === "down" ? "bg-red-500" : "bg-amber-400",
+          state === "up" ? "bg-green-400" : state === "down" ? "bg-red-400" : "bg-amber-400",
           state === "up" && "animate-pulse"
         )}
         aria-hidden

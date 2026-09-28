@@ -38,34 +38,34 @@ export function getOutcomeColor(outcome?: string): string {
 }
 
 /**
- * Get background color class for outcome status
+ * Get background color class for outcome status (dark theme)
  */
 export function getOutcomeBgColor(outcome?: string): string {
   switch (outcome) {
     case "SUCCESS":
-      return "bg-green-100 text-green-800";
+      return "bg-green-900/40 text-green-300";
     case "PARTIAL":
-      return "bg-amber-100 text-amber-800";
+      return "bg-amber-900/40 text-amber-300";
     case "FAILED":
-      return "bg-red-100 text-red-800";
+      return "bg-red-900/40 text-red-300";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-slate-700/50 text-slate-300";
   }
 }
 
 /**
- * Get confidence level color
+ * Get confidence level color (dark theme)
  */
 export function getConfidenceColor(confidence: string): string {
   switch (confidence) {
     case "HIGH":
-      return "text-green-600";
+      return "text-green-400";
     case "MEDIUM":
-      return "text-amber-600";
+      return "text-amber-400";
     case "LOW":
-      return "text-red-600";
+      return "text-red-400";
     default:
-      return "text-gray-600";
+      return "text-slate-400";
   }
 }
 

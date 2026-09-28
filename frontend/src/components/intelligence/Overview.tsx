@@ -6,10 +6,10 @@ import { CONFIDENCE_LABEL } from "@/components/ui";
 import { AnimatedNumber } from "./charts";
 
 const LEVEL_FILL: Record<ConfidenceLevel, string> = {
-  HIGH: "bg-green-600",
-  MEDIUM: "bg-amber-500",
-  LOW: "bg-orange-500",
-  INSUFFICIENT_DATA: "bg-gray-300",
+  HIGH: "bg-green-500",
+  MEDIUM: "bg-amber-400",
+  LOW: "bg-orange-400",
+  INSUFFICIENT_DATA: "bg-slate-500",
 };
 
 /** Factory knowledge in numbers. Every value is computed by the backend. */
@@ -43,22 +43,22 @@ export function KnowledgeOverview({ overview }: { overview: IntelligenceOverview
       </h2>
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {cards.map((c) => (
-          <div key={c.label} className="bg-white rounded-lg border border-gray-200 p-4">
-            <p className="text-xs text-gray-500">{c.label}</p>
-            <p className="text-2xl font-bold text-industrial-900 mt-1">
+          <div key={c.label} className="glass-card p-4">
+            <p className="text-xs text-slate-400">{c.label}</p>
+            <p className="text-2xl font-bold text-white mt-1">
               <AnimatedNumber value={c.value} format={c.format} />
             </p>
-            <p className="text-xs text-gray-500 mt-1 leading-snug">{c.sub}</p>
+            <p className="text-xs text-slate-400 mt-1 leading-snug">{c.sub}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="glass-card p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-sm font-semibold text-industrial-900">How confidently TRACE can answer each known problem today</p>
-          <p className="text-xs text-gray-500">The recommendation engine scored every problem over all recorded outcomes</p>
+          <p className="text-sm font-semibold text-white">How confidently TRACE can answer each known problem today</p>
+          <p className="text-xs text-slate-400">The recommendation engine scored every problem over all recorded outcomes</p>
         </div>
-        <div className="flex h-3 rounded-full overflow-hidden mt-3 gap-0.5" aria-hidden>
+        <div className="flex h-3 rounded-full overflow-hidden mt-3 gap-0.5 bg-slate-700" aria-hidden>
           {(Object.keys(dist) as ConfidenceLevel[]).map((level) =>
             dist[level] ? <div key={level} className={LEVEL_FILL[level]} style={{ width: `${(dist[level] / total) * 100}%` }} /> : null
           )}
@@ -67,9 +67,9 @@ export function KnowledgeOverview({ overview }: { overview: IntelligenceOverview
           {(Object.keys(dist) as ConfidenceLevel[]).map((level) => (
             <li key={level} className="flex items-center gap-1.5">
               <span className={`w-2.5 h-2.5 rounded-sm ${LEVEL_FILL[level]}`} aria-hidden />
-              <span className="text-gray-700">{CONFIDENCE_LABEL[level]}</span>
-              <span className="font-semibold text-gray-900 tabular-nums">{dist[level]}</span>
-              <span className="text-gray-500">problems</span>
+              <span className="text-slate-300">{CONFIDENCE_LABEL[level]}</span>
+              <span className="font-semibold text-white tabular-nums">{dist[level]}</span>
+              <span className="text-slate-400">problems</span>
             </li>
           ))}
         </ul>

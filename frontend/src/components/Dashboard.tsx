@@ -54,7 +54,7 @@ export function Dashboard({ onReportIncident, onViewMachineMemory }: DashboardPr
           stats?.history_start && stats.history_end ? (
             <>
               Maintenance work orders across the fleet, {formatDay(stats.history_start)} – {formatDay(stats.history_end)}.
-              <span className="block text-xs text-gray-500 mt-0.5">
+              <span className="block text-xs text-slate-400 mt-0.5">
                 Synthetic, operationally realistic history · memory bank {stats.memory_bank}
               </span>
             </>
@@ -117,7 +117,7 @@ export function Dashboard({ onReportIncident, onViewMachineMemory }: DashboardPr
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Section icon={<BarChart3 className="w-5 h-5 text-industrial-600" />} title="Intervention outcomes" id="outcomes">
+            <Section icon={<BarChart3 className="w-5 h-5" />} title="Intervention outcomes" id="outcomes">
               <div className="space-y-4">
                 <OutcomeRow label="Worked" count={stats.outcome_distribution.SUCCESS} total={stats.incidents_with_outcome} icon={<CheckCircle className="w-4 h-4" />} color="green" />
                 <OutcomeRow label="Partially worked" count={stats.outcome_distribution.PARTIAL} total={stats.incidents_with_outcome} icon={<AlertTriangle className="w-4 h-4" />} color="amber" />
@@ -126,7 +126,7 @@ export function Dashboard({ onReportIncident, onViewMachineMemory }: DashboardPr
               </div>
             </Section>
 
-            <Section icon={<AlertTriangle className="w-5 h-5 text-amber-500" />} title="Most frequent problems" id="problems">
+            <Section icon={<AlertTriangle className="w-5 h-5" />} title="Most frequent problems" id="problems">
               <div className="space-y-3">
                 {Object.entries(stats.defect_type_distribution)
                   .sort(([, a], [, b]) => b - a)
@@ -138,7 +138,7 @@ export function Dashboard({ onReportIncident, onViewMachineMemory }: DashboardPr
             </Section>
           </div>
 
-          <Section icon={<Server className="w-5 h-5 text-industrial-600" />} title="Fleet by equipment type" id="fleet" aside={<span className="text-xs text-gray-500">Open a type's showcase machine</span>}>
+          <Section icon={<Server className="w-5 h-5" />} title="Fleet by equipment type" id="fleet" aside={<span className="text-xs text-slate-400">Open a type's showcase machine</span>}>
             {fleet ? (
               <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 {fleet.machine_types.map((type) => {
@@ -149,17 +149,17 @@ export function Dashboard({ onReportIncident, onViewMachineMemory }: DashboardPr
                       <button
                         type="button"
                         onClick={() => target && onViewMachineMemory(target)}
-                        className={cn(CARD, CARD_INTERACTIVE, "w-full p-4 text-left group shadow-none")}
+                        className={cn("glass-pod w-full p-4 text-left group", CARD_INTERACTIVE)}
                       >
-                        <span className="flex items-center justify-between text-industrial-600">
+                        <span className="flex items-center justify-between text-[#38bdf8]">
                           <Server className="w-5 h-5" aria-hidden />
-                          <ArrowRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden />
+                          <ArrowRight className="w-4 h-4 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden />
                         </span>
-                        <span className="block mt-2 font-medium text-gray-900">{humanize(type.label)}</span>
-                        <span className="block text-sm text-gray-500">
+                        <span className="block mt-2 font-medium text-white">{humanize(type.label)}</span>
+                        <span className="block text-sm text-slate-400">
                           {count} work orders · {type.machines.length} machines
                         </span>
-                        {target && <span className="block text-xs text-industrial-600 mt-1">Open {target}</span>}
+                        {target && <span className="block text-xs text-[#38bdf8] mt-1">Open {target}</span>}
                       </button>
                     </li>
                   );
@@ -176,10 +176,10 @@ export function Dashboard({ onReportIncident, onViewMachineMemory }: DashboardPr
 }
 
 const OUTCOME_COLORS = {
-  green: { bar: "bg-green-500", icon: "text-green-600" },
-  amber: { bar: "bg-amber-500", icon: "text-amber-600" },
-  red: { bar: "bg-red-500", icon: "text-red-600" },
-  gray: { bar: "bg-gray-400", icon: "text-gray-500" },
+  green: { bar: "bg-green-500", icon: "text-green-400" },
+  amber: { bar: "bg-amber-400", icon: "text-amber-400" },
+  red: { bar: "bg-red-500", icon: "text-red-400" },
+  gray: { bar: "bg-slate-500", icon: "text-slate-400" },
 };
 
 function OutcomeRow({
@@ -199,17 +199,17 @@ function OutcomeRow({
   return (
     <div>
       <div className="flex items-center justify-between mb-1 text-sm">
-        <span className="flex items-center gap-2 font-medium text-gray-700">
+        <span className="flex items-center gap-2 font-medium text-white">
           <span className={OUTCOME_COLORS[color].icon} aria-hidden>
             {icon}
           </span>
           {label}
         </span>
-        <span className="text-gray-600 tabular-nums">
+        <span className="text-slate-300 tabular-nums">
           {count.toLocaleString()} ({percentage}%)
         </span>
       </div>
-      <div className="w-full bg-gray-100 rounded-full h-2" aria-hidden>
+      <div className="w-full bg-slate-700 rounded-full h-2" aria-hidden>
         <div className={cn("h-2 rounded-full origin-left animate-grow-x", OUTCOME_COLORS[color].bar)} style={{ width: `${percentage}%` }} />
       </div>
     </div>
@@ -219,14 +219,14 @@ function OutcomeRow({
 function DefectRow({ defect, count, max, total }: { defect: string; count: number; max: number; total: number }) {
   return (
     <div className="flex items-center gap-3 text-sm">
-      <span className="w-44 text-gray-700 truncate" title={humanize(defect)}>
+      <span className="w-44 text-white truncate" title={humanize(defect)}>
         {humanize(defect)}
       </span>
-      <div className="flex-1 bg-gray-100 rounded-full h-2" aria-hidden>
-        <div className="bg-amber-500 h-2 rounded-full origin-left animate-grow-x" style={{ width: `${(count / max) * 100}%` }} />
+      <div className="flex-1 bg-slate-700 rounded-full h-2" aria-hidden>
+        <div className="bg-amber-400 h-2 rounded-full origin-left animate-grow-x" style={{ width: `${(count / max) * 100}%` }} />
       </div>
-      <span className="w-20 text-right font-medium text-gray-700 tabular-nums">
-        {count} <span className="text-gray-400 font-normal">({Math.round((count / total) * 100)}%)</span>
+      <span className="w-20 text-right font-medium text-white tabular-nums">
+        {count} <span className="text-slate-400 font-normal">({Math.round((count / total) * 100)}%)</span>
       </span>
     </div>
   );

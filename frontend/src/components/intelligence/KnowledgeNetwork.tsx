@@ -58,7 +58,7 @@ export function KnowledgeNetwork({ report }: { report: IntelligenceReport }) {
   const focused = nodes.find((n) => n.id === focus);
 
   return (
-    <Section icon={<Network className="w-5 h-5 text-industrial-600" />} title="Knowledge network" id="network">
+    <Section icon={<Network className="w-5 h-5 text-[#38bdf8]" />} title="Knowledge network" id="network">
       <div className="flex flex-wrap items-center gap-2 -mt-2 mb-3" role="group" aria-label="Equipment type">
         {report.network.map((n) => (
           <button
@@ -71,14 +71,14 @@ export function KnowledgeNetwork({ report }: { report: IntelligenceReport }) {
             }}
             className={cn(
               "text-xs px-2.5 py-1 rounded-full border",
-              type === n.machine_type ? "bg-industrial-600 text-white border-industrial-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"
+              type === n.machine_type ? "bg-[#38bdf8] text-white border-[#38bdf8]" : "border-white/10 text-slate-300 hover:bg-slate-700/50"
             )}
           >
             {humanize(n.label)}
           </button>
         ))}
       </div>
-      <p className="text-xs text-gray-500 mb-2">
+      <p className="text-xs text-slate-400 mb-2">
         Hover or tab to a node to trace its connections. Line width = number of work orders. ★ = what TRACE currently recommends for a problem.
       </p>
 
@@ -134,13 +134,13 @@ export function KnowledgeNetwork({ report }: { report: IntelligenceReport }) {
         </svg>
       </div>
 
-      <div className="min-h-[2.5rem] mt-2 text-sm text-gray-700" aria-live="polite">
+      <div className="min-h-[2.5rem] mt-2 text-sm text-slate-300" aria-live="polite">
         {focused ? (
           <p>
             <strong>{focused.label}</strong>: {focused.detail}
           </p>
         ) : (
-          <p className="text-gray-400">Select a node to see its numbers.</p>
+          <p className="text-slate-500">Select a node to see its numbers.</p>
         )}
       </div>
 

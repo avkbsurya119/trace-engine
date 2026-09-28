@@ -44,7 +44,7 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 space-y-6">
-          <Section icon={<FileText className="w-5 h-5 text-industrial-600" />} title="What happened" id="what-happened">
+          <Section icon={<FileText className="w-5 h-5" />} title="What happened" id="what-happened">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
               <Field label="Machine" value={incident.machine_id} sub={humanize(incident.machine_type)} />
               <Field label="Line" value={incident.production_line} />
@@ -56,15 +56,15 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
             {incident.symptoms.length > 0 && (
               <ul className="flex flex-wrap gap-2 mb-3" aria-label="Symptoms">
                 {incident.symptoms.map((s) => (
-                  <li key={s} className="px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-xs">
+                  <li key={s} className="px-2 py-1.5 bg-amber-900/30 text-amber-300 border border-amber-500/20 rounded-full text-xs">
                     {s}
                   </li>
                 ))}
               </ul>
             )}
-            <p className="text-gray-700 text-sm">{incident.description}</p>
+            <p className="text-slate-300 text-sm">{incident.description}</p>
             {incident.sensor_values && Object.keys(incident.sensor_values).length > 0 && (
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-slate-400 mt-2">
                 Readings:{" "}
                 {Object.entries(incident.sensor_values)
                   .map(([k, v]) => `${humanize(k)} ${v}`)

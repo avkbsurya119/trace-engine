@@ -25,22 +25,22 @@ export function MemoryImpactHero({ impact }: { impact: MemoryImpact }) {
       : null;
 
   return (
-    <section aria-labelledby="impact-heading" className="bg-white rounded-xl border border-industrial-200 shadow-sm overflow-hidden">
+    <section aria-labelledby="impact-heading" className="glass-card rounded-xl border border-white/10 overflow-hidden">
       <div className="px-6 pt-6">
-        <p className="text-xs uppercase tracking-wide font-semibold text-industrial-500">Memory impact</p>
-        <h2 id="impact-heading" className="text-xl font-bold text-industrial-900 mt-1">
+        <p className="text-xs uppercase tracking-wide font-semibold text-[#38bdf8]">Memory impact</p>
+        <h2 id="impact-heading" className="text-xl font-bold text-white mt-1">
           Every recorded repair becomes evidence for the next technician
         </h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-4 p-6">
-        <Flow title="Without TRACE memory" icon={<HelpCircle className="w-5 h-5 text-gray-500" aria-hidden />} steps={WITHOUT} muted />
-        <Flow title="With TRACE memory" icon={<Brain className="w-5 h-5 text-industrial-600" aria-hidden />} steps={WITH} />
+        <Flow title="Without TRACE memory" icon={<HelpCircle className="w-5 h-5 text-slate-400" aria-hidden />} steps={WITHOUT} muted />
+        <Flow title="With TRACE memory" icon={<Brain className="w-5 h-5 text-[#38bdf8]" aria-hidden />} steps={WITH} />
       </div>
 
-      <div className="border-t border-gray-100 bg-gray-50/60 px-6 py-5">
-        <p className="text-sm font-semibold text-industrial-900">What the recorded history shows</p>
-        <p className="text-xs text-gray-500 mb-3">
+      <div className="border-t border-white/10 bg-slate-700/50 px-6 py-5">
+        <p className="text-sm font-semibold text-white">What the recorded history shows</p>
+        <p className="text-xs text-slate-400 mb-3">
           Replay of every past work order in time order: what memory would have recommended at that moment, compared with what the
           technician actually did.
         </p>
@@ -69,18 +69,18 @@ export function MemoryImpactHero({ impact }: { impact: MemoryImpact }) {
 
 function Flow({ title, icon, steps, muted = false }: { title: string; icon: React.ReactNode; steps: string[]; muted?: boolean }) {
   return (
-    <div className={muted ? "rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-4" : "rounded-lg border-2 border-industrial-200 bg-industrial-50/60 p-4"}>
-      <p className={`flex items-center gap-2 font-semibold ${muted ? "text-gray-600" : "text-industrial-900"}`}>
+    <div className={muted ? "rounded-lg border-2 border-dashed border-slate-500 bg-slate-700/50 p-4" : "rounded-lg border-2 border-[#38bdf8]/30 bg-[#38bdf8]/10 p-4"}>
+      <p className={`flex items-center gap-2 font-semibold ${muted ? "text-slate-400" : "text-white"}`}>
         {icon}
         {title}
       </p>
       <ol className="mt-3 flex flex-wrap items-center gap-y-2">
         {steps.map((step, i) => (
           <li key={step} className="flex items-center">
-            <span className={`text-sm px-3 py-1.5 rounded-md ${muted ? "bg-white text-gray-600 border border-gray-200" : "bg-white text-industrial-900 border border-industrial-200"}`}>
+            <span className={`text-sm px-3 py-1.5 rounded-md ${muted ? "bg-slate-800 text-slate-400 border border-white/10" : "bg-slate-800 text-white border border-[#38bdf8]/30"}`}>
               {step}
             </span>
-            {i < steps.length - 1 && <ArrowRight className={`w-3.5 h-3.5 mx-1 ${muted ? "text-gray-300" : "text-industrial-300"}`} aria-hidden />}
+            {i < steps.length - 1 && <ArrowRight className={`w-3.5 h-3.5 mx-1 ${muted ? "text-slate-500" : "text-[#38bdf8]/50"}`} aria-hidden />}
           </li>
         ))}
       </ol>
@@ -90,13 +90,13 @@ function Flow({ title, icon, steps, muted = false }: { title: string; icon: Reac
 
 function Stat({ title, group, note, highlight = false }: { title: string; group: ImpactGroup; note?: string; highlight?: boolean }) {
   return (
-    <div className={highlight ? "rounded-lg bg-green-50 border border-green-200 p-4" : "rounded-lg bg-white border border-gray-200 p-4"}>
-      <p className="text-xs text-gray-600">{title}</p>
-      <p className={`text-3xl font-bold mt-1 ${highlight ? "text-green-800" : "text-gray-900"}`}>{formatPercent(group.success_rate)}</p>
-      <p className="text-xs text-gray-600">
+    <div className={highlight ? "rounded-lg bg-green-900/20 border border-green-500/30 p-4" : "rounded-lg glass-pod border border-white/10 p-4"}>
+      <p className="text-xs text-slate-400">{title}</p>
+      <p className={`text-3xl font-bold mt-1 ${highlight ? "text-green-300" : "text-white"}`}>{formatPercent(group.success_rate)}</p>
+      <p className="text-xs text-slate-400">
         worked · {group.worked} of {group.attempts} attempts · median downtime {formatHours(group.median_downtime_minutes)}
       </p>
-      {note && <p className={`text-xs mt-2 ${highlight ? "text-green-800 font-medium" : "text-gray-500"}`}>{note}</p>}
+      {note && <p className={`text-xs mt-2 ${highlight ? "text-green-300 font-medium" : "text-slate-400"}`}>{note}</p>}
     </div>
   );
 }

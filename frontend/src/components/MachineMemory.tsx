@@ -130,23 +130,14 @@ export function MachineMemory({ machineId, onSelectMachine, onReportIncident, on
         <StatTile label="Downtime logged" value={`${memory.total_downtime_hours ?? 0} h`} sub="Across this machine's work orders" icon={<Clock className="w-5 h-5" />} tone="warn" />
       </div>
 
-      <Section
-        icon={<Calendar className="w-5 h-5 text-industrial-600" />}
-        title="Maintenance timeline"
-        id="timeline"
-        aside={<span className="text-xs text-gray-500">Newest first · from the work-order record</span>}
-      >
-        <MemoryTimeline incidents={memory.timeline || []} />
-      </Section>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Section icon={<CheckCircle className="w-5 h-5 text-green-600" />} title="What has worked" id="worked">
+        <Section icon={<CheckCircle className="w-5 h-5 text-green-400" />} title="What has worked" id="worked">
           <InterventionList interventions={memory.successful_interventions || {}} type="success" />
         </Section>
-        <Section icon={<XCircle className="w-5 h-5 text-red-600" />} title="What hasn't worked" id="failed">
+        <Section icon={<XCircle className="w-5 h-5 text-red-400" />} title="What hasn't worked" id="failed">
           <InterventionList interventions={memory.failed_interventions || {}} type="failed" />
         </Section>
-        <Section icon={<AlertTriangle className="w-5 h-5 text-amber-500" />} title="Recurring problems" id="recurring">
+        <Section icon={<AlertTriangle className="w-5 h-5 text-amber-400" />} title="Recurring problems" id="recurring">
           {memory.recurring_defects && memory.recurring_defects.length > 0 ? (
             <div className="space-y-3">
               {memory.recurring_defects.map(([defect, count]) => (
@@ -154,16 +145,25 @@ export function MachineMemory({ machineId, onSelectMachine, onReportIncident, on
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-sm">No recurring problems.</p>
+            <p className="text-slate-400 text-sm">No recurring problems.</p>
           )}
         </Section>
       </div>
 
       {(Object.keys(memory.successful_interventions || {}).length > 0 || Object.keys(memory.failed_interventions || {}).length > 0) && (
-        <Section icon={<BarChart3 className="w-5 h-5 text-industrial-600" />} title="Interventions on this machine" id="interventions">
+        <Section icon={<BarChart3 className="w-5 h-5" />} title="Interventions on this machine" id="interventions">
           <InterventionChart successful={memory.successful_interventions || {}} failed={memory.failed_interventions || {}} />
         </Section>
       )}
+
+      <Section
+        icon={<Calendar className="w-5 h-5" />}
+        title="Maintenance timeline"
+        id="timeline"
+        aside={<span className="text-xs text-slate-400">Newest first · from the work-order record</span>}
+      >
+        <MemoryTimeline incidents={memory.timeline || []} />
+      </Section>
     </div>
   );
 }
@@ -208,32 +208,32 @@ function MachinePicker({ onSelect }: { onSelect: (machineId: string) => void }) 
         <label htmlFor="machine-search" className="sr-only">
           Find a machine
         </label>
-        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
         <input
           id="machine-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Find a machine, e.g. cnc-204"
-          className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="w-full pl-9 pr-3 py-2.5 glass-input text-sm"
         />
       </form>
-      {groups.length === 0 && <p className="text-sm text-gray-500">No machine matches “{query}”.</p>}
+      {groups.length === 0 && <p className="text-sm text-slate-400">No machine matches "{query}".</p>}
       {groups.map((type) => (
         <div key={type.machine_type}>
-          <p className="text-xs uppercase tracking-wide font-semibold text-gray-500 mb-2">{humanize(type.label)}</p>
+          <p className="text-xs uppercase tracking-wide font-semibold text-[#38bdf8] mb-2">{humanize(type.label)}</p>
           <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {type.machines.map((m) => (
               <li key={m.machine_id}>
                 <button
                   type="button"
                   onClick={() => onSelect(m.machine_id)}
-                  className={cn("w-full text-left rounded-lg border border-gray-200 px-3 py-2", CARD_INTERACTIVE)}
+                  className={cn("glass-pod w-full text-left px-3 py-2", CARD_INTERACTIVE)}
                 >
-                  <span className="block text-sm font-medium text-gray-900">
+                  <span className="block text-sm font-medium text-white">
                     {m.machine_id}
-                    {m.machine_id === type.hero_machine_id && <span className="ml-1 text-xs text-industrial-600">★ showcase</span>}
+                    {m.machine_id === type.hero_machine_id && <span className="ml-1 text-xs text-[#38bdf8]">★ showcase</span>}
                   </span>
-                  <span className="block text-xs text-gray-500 truncate">{m.production_line}</span>
+                  <span className="block text-xs text-slate-400 truncate">{m.production_line}</span>
                 </button>
               </li>
             ))}
@@ -247,7 +247,7 @@ function MachinePicker({ onSelect }: { onSelect: (machineId: string) => void }) 
 function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
   const [problem, setProblem] = useState<string | null>(null);
   if (incidents.length === 0) {
-    return <p className="text-gray-500 text-sm">No incidents recorded.</p>;
+    return <p className="text-slate-400 text-sm">No incidents recorded.</p>;
   }
 
   // How each work order relates to the previous one for the same problem.
@@ -271,8 +271,10 @@ function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
             aria-pressed={problem === key}
             onClick={() => setProblem(key)}
             className={cn(
-              "text-xs px-2.5 py-1 rounded-full border transition-colors",
-              problem === key ? "bg-industrial-600 text-white border-industrial-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"
+              "text-xs px-2.5 py-1.5 rounded-full border transition-all",
+              problem === key
+                ? "bg-[#38bdf8] text-[#0a1628] border-[#38bdf8] font-medium"
+                : "border-white/10 text-slate-300 hover:bg-white/5"
             )}
           >
             {key ? `${humanize(key)} (${counts[key]})` : `All (${incidents.length})`}
@@ -280,7 +282,7 @@ function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
         ))}
       </div>
     <div className="relative">
-      <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" aria-hidden />
+      <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-slate-700" aria-hidden />
       <ol className="space-y-3">
         {shown.map((incident, i) => (
           <li
@@ -292,59 +294,59 @@ function MemoryTimeline({ incidents }: { incidents: MachineTimelineEntry[] }) {
               className={cn(
                 "absolute left-0 top-1 w-6 h-6 rounded-full flex items-center justify-center",
                 incident.action_outcome === "SUCCESS"
-                  ? "bg-green-100"
+                  ? "bg-green-900/40"
                   : incident.action_outcome === "FAILED"
-                  ? "bg-red-100"
+                  ? "bg-red-900/40"
                   : incident.action_outcome === "PARTIAL"
-                  ? "bg-amber-100"
-                  : "bg-gray-100"
+                  ? "bg-amber-900/40"
+                  : "bg-slate-700/50"
               )}
             >
               {incident.action_outcome === "SUCCESS" ? (
-                <CheckCircle className="w-4 h-4 text-green-600" />
+                <CheckCircle className="w-4 h-4 text-green-400" />
               ) : incident.action_outcome === "FAILED" ? (
-                <XCircle className="w-4 h-4 text-red-600" />
+                <XCircle className="w-4 h-4 text-red-400" />
               ) : (
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
               )}
             </div>
-            <div className="bg-gray-50 rounded-lg p-3">
+            <div className="glass-pod p-3">
               <div className="flex items-center justify-between mb-1 gap-2">
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-white">
                   {humanize(incident.defect_type)}
                   {i === 0 && !problem && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-xs text-industrial-600">
+                    <span className="ml-2 inline-flex items-center gap-1 text-xs text-[#38bdf8]">
                       <Zap className="w-3 h-3" aria-hidden />
                       Most recent
                     </span>
                   )}
                   {chain.get(incident.incident_id) === "follow-up" && (
-                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Follow-up: previous attempt didn&apos;t work</span>
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-300">Follow-up: previous attempt didn&apos;t work</span>
                   )}
                   {chain.get(incident.incident_id) === "recurred" && (
-                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Came back after a fix</span>
+                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-300">Came back after a fix</span>
                   )}
                 </p>
                 <span className={cn("text-xs px-2 py-0.5 rounded flex-shrink-0", getOutcomeBgColor(incident.action_outcome))}>
                   {incident.action_outcome ?? "OPEN"}
                 </span>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-400">
                 {formatDay(incident.timestamp)} · {incident.incident_id}
                 {incident.technician_id ? ` · ${incident.technician_id}` : ""}
                 {incident.operating_hours ? ` · ${incident.operating_hours.toLocaleString()} h` : ""}
                 {incident.downtime_minutes ? ` · downtime ${formatHours(incident.downtime_minutes)}` : ""}
               </p>
               {incident.action_taken ? (
-                <p className="text-sm text-gray-700 mt-1">
-                  {incident.intervention_category && <span className="font-medium">{incident.intervention_category}: </span>}
+                <p className="text-sm text-slate-300 mt-1">
+                  {incident.intervention_category && <span className="font-medium text-white">{incident.intervention_category}: </span>}
                   {incident.action_taken}
                 </p>
               ) : (
-                <p className="text-sm text-gray-500 mt-1">No outcome recorded yet.</p>
+                <p className="text-sm text-slate-500 mt-1">No outcome recorded yet.</p>
               )}
               {incident.technician_notes && (
-                <p className="text-xs text-gray-500 mt-1">&ldquo;{incident.technician_notes}&rdquo;</p>
+                <p className="text-xs text-slate-400 mt-1">&ldquo;{incident.technician_notes}&rdquo;</p>
               )}
             </div>
           </li>
@@ -368,16 +370,16 @@ function DefectBar({
   return (
     <div>
       <div className="flex justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">{humanize(defect)}</span>
-        <span className="text-sm text-gray-500">{count} incidents</span>
+        <span className="text-sm font-medium text-white">{humanize(defect)}</span>
+        <span className="text-sm text-slate-400">{count} incidents</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-4">
+      <div className="w-full bg-slate-700 rounded-full h-4">
         <div
-          className="bg-amber-500 h-4 rounded-full flex items-center justify-end pr-2"
+          className="bg-amber-400 h-4 rounded-full flex items-center justify-end pr-2"
           style={{ width: `${Math.max(percentage, 10)}%` }}
         >
           {percentage >= 20 && (
-            <span className="text-xs text-white font-medium">{percentage}%</span>
+            <span className="text-xs text-[#0a1628] font-medium">{percentage}%</span>
           )}
         </div>
       </div>
@@ -395,7 +397,7 @@ function InterventionList({
   const entries = Object.entries(interventions);
   if (entries.length === 0) {
     return (
-      <p className="text-gray-500 text-sm">
+      <p className="text-slate-400 text-sm">
         No {type === "success" ? "successful" : "failed"} interventions recorded.
       </p>
     );
@@ -406,14 +408,14 @@ function InterventionList({
         <div
           key={action}
           className={cn(
-            "p-3 rounded-lg",
-            type === "success" ? "bg-green-50" : "bg-red-50"
+            "p-3 rounded-xl",
+            type === "success" ? "bg-green-900/20 border border-green-500/20" : "bg-red-900/20 border border-red-500/20"
           )}
         >
           <p
             className={cn(
               "font-medium",
-              type === "success" ? "text-green-800" : "text-red-800"
+              type === "success" ? "text-green-300" : "text-red-300"
             )}
           >
             {action}
@@ -421,7 +423,7 @@ function InterventionList({
           <p
             className={cn(
               "text-sm mt-1",
-              type === "success" ? "text-green-600" : "text-red-600"
+              type === "success" ? "text-green-400/80" : "text-red-400/80"
             )}
           >
             {type === "success" ? "Resolved" : "Failed for"}: {countList(defects)}
@@ -454,12 +456,12 @@ function InterventionChart({
       {data.slice(0, 5).map((item) => (
         <div key={item.action}>
           <div className="flex justify-between text-sm mb-1">
-            <span className="text-gray-700 truncate pr-4">{item.action}</span>
-            <span className="text-gray-500 flex-shrink-0">
+            <span className="text-white truncate pr-4">{item.action}</span>
+            <span className="text-slate-400 flex-shrink-0">
               {item.success} success · {item.failed} failed
             </span>
           </div>
-          <div className="flex h-6 bg-gray-100 rounded overflow-hidden">
+          <div className="flex h-6 bg-slate-700 rounded overflow-hidden">
             <div
               className="bg-green-500"
               style={{ width: `${(item.success / maxTotal) * 100}%` }}
@@ -471,14 +473,14 @@ function InterventionChart({
           </div>
         </div>
       ))}
-      <div className="flex justify-center gap-6 pt-4 border-t">
+      <div className="flex justify-center gap-6 pt-4 border-t border-white/10">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-green-500 rounded" />
-          <span className="text-sm text-gray-600">Success</span>
+          <span className="text-sm text-slate-300">Success</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-500 rounded" />
-          <span className="text-sm text-gray-600">Failed</span>
+          <span className="text-sm text-slate-300">Failed</span>
         </div>
       </div>
     </div>

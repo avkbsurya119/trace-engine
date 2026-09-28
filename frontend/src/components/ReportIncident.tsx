@@ -142,8 +142,8 @@ export function ReportIncident({
           {error && <ErrorState title="The incident could not be analyzed" detail={error} />}
 
           {fleet && fleet.demo_presets.length > 0 && !presenting && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-industrial-50 border border-industrial-100 px-3 py-2">
-              <label htmlFor="demo-preset" className="text-sm text-industrial-800 font-medium">
+            <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[#38bdf8]/10 border border-[#38bdf8]/20 px-4 py-3">
+              <label htmlFor="demo-preset" className="text-sm text-[#38bdf8] font-medium">
                 Load a demo incident
               </label>
               <select
@@ -153,7 +153,7 @@ export function ReportIncident({
                   loadPreset(e.target.value);
                   e.target.value = "";
                 }}
-                className="flex-1 min-w-[14rem] px-2 py-1.5 border border-industrial-200 rounded-md text-sm bg-white"
+                className="flex-1 min-w-[14rem] px-3 py-2 glass-input text-sm"
               >
                 <option value="">Choose…</option>
                 {fleet.demo_presets.map((p) => (
@@ -168,12 +168,12 @@ export function ReportIncident({
           {/* Machine */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Machine type *</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Machine type *</label>
               <select
                 required
                 value={formData.machine_type}
                 onChange={(e) => selectMachineType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="w-full px-3 py-2.5 glass-input"
               >
                 <option value="">{fleet ? "Select machine type" : "Loading..."}</option>
                 {fleet?.machine_types.map((t) => (
@@ -184,13 +184,13 @@ export function ReportIncident({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Machine *</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Machine *</label>
               <select
                 required
                 disabled={!machineType}
                 value={formData.machine_id}
                 onChange={(e) => selectMachine(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500 disabled:bg-gray-50"
+                className="w-full px-3 py-2.5 glass-input disabled:opacity-50"
               >
                 <option value="">Select machine</option>
                 {machineType?.machines.map((m) => (
@@ -204,16 +204,16 @@ export function ReportIncident({
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Production line</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Production line</label>
               <input
                 readOnly
                 value={formData.production_line}
                 placeholder="Set by machine"
-                className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-gray-700"
+                className="w-full px-3 py-2.5 glass-input opacity-70 cursor-not-allowed"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Operating hours</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Operating hours</label>
               <input
                 type="number"
                 min={0}
@@ -222,30 +222,30 @@ export function ReportIncident({
                   setFormData((prev) => ({ ...prev, operating_hours: e.target.value ? parseInt(e.target.value) : undefined }))
                 }
                 placeholder="Hour meter"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="w-full px-3 py-2.5 glass-input"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-industrial-700 mb-1">Technician ID</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Technician ID</label>
               <input
                 type="text"
                 value={formData.technician_id ?? ""}
                 onChange={(e) => setFormData((prev) => ({ ...prev, technician_id: e.target.value }))}
                 placeholder="e.g. T-117"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="w-full px-3 py-2.5 glass-input"
               />
             </div>
           </div>
 
           {/* Problem */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-1">Problem *</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Problem *</label>
             <select
               required
               disabled={!machineType}
               value={defectChoice}
               onChange={(e) => selectDefect(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500 disabled:bg-gray-50"
+              className="w-full px-3 py-2.5 glass-input disabled:opacity-50"
             >
               <option value="">Select problem</option>
               {machineType?.defect_types.map((d) => (
@@ -265,31 +265,31 @@ export function ReportIncident({
                   setFormData((prev) => ({ ...prev, defect_type: toKey(e.target.value) }));
                 }}
                 placeholder="Short name for the problem, e.g. chip conveyor jam"
-                className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="mt-2 w-full px-3 py-2.5 glass-input"
               />
             )}
           </div>
 
           {/* Symptoms */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-2">Observed symptoms</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Observed symptoms</label>
             <div className="flex flex-wrap gap-2 mb-3">
               {[...symptomOptions, ...formData.symptoms.filter((s) => !symptomOptions.includes(s))].map((symptom) => (
                 <button
                   key={symptom}
                   type="button"
                   onClick={() => toggleSymptom(symptom)}
-                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                  className={`px-3 py-1.5 rounded-full text-sm transition-all ${
                     formData.symptoms.includes(symptom)
-                      ? "bg-industrial-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-[#38bdf8] text-[#0a1628] font-medium"
+                      : "bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10"
                   }`}
                 >
                   {symptom}
                 </button>
               ))}
               {symptomOptions.length === 0 && formData.symptoms.length === 0 && (
-                <span className="text-sm text-gray-400">Pick a problem to see common symptoms, or add your own.</span>
+                <span className="text-sm text-slate-500">Pick a problem to see common symptoms, or add your own.</span>
               )}
             </div>
             <div className="flex gap-2">
@@ -299,12 +299,12 @@ export function ReportIncident({
                 value={customSymptom}
                 onChange={(e) => setCustomSymptom(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomSymptom())}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+                className="flex-1 px-3 py-2.5 glass-input"
               />
               <button
                 type="button"
                 onClick={addCustomSymptom}
-                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="px-3 py-2.5 bg-white/5 text-slate-300 rounded-xl hover:bg-white/10 border border-white/10 transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -313,7 +313,7 @@ export function ReportIncident({
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1">
               Incident Description *
             </label>
             <textarea
@@ -324,13 +324,13 @@ export function ReportIncident({
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, description: e.target.value }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+              className="w-full px-3 py-2.5 glass-input"
             />
           </div>
 
           {/* Suspected Root Cause */}
           <div>
-            <label className="block text-sm font-medium text-industrial-700 mb-1">
+            <label className="block text-sm font-medium text-slate-300 mb-1">
               Suspected Root Cause (Optional)
             </label>
             <input
@@ -343,14 +343,14 @@ export function ReportIncident({
                   suspected_root_cause: e.target.value,
                 }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
+              className="w-full px-3 py-2.5 glass-input"
             />
           </div>
 
           {loading && <AnalysisProgress machineId={formData.machine_id} machineType={formData.machine_type} />}
 
           {/* Submit */}
-          <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-4 pt-4 border-t border-white/10">
             <button type="button" onClick={onCancel} className={BUTTON_SECONDARY}>
               Cancel
             </button>

@@ -38,16 +38,16 @@ export function TrustPanel({ problems }: { problems: ProblemSummary[] }) {
   const winner = data?.recommendation.evidence.find((e) => e.verdict === "selected");
 
   return (
-    <Section icon={<ShieldCheck className="w-5 h-5 text-industrial-600" />} title="Recommendation trust" id="trust">
+    <Section icon={<ShieldCheck className="w-5 h-5 text-[#38bdf8]" />} title="Recommendation trust" id="trust">
       <div className="flex flex-wrap items-center gap-3 -mt-2 mb-4">
-        <label htmlFor="trust-problem" className="text-sm text-gray-600">
+        <label htmlFor="trust-problem" className="text-sm text-slate-400">
           Problem
         </label>
         <select
           id="trust-problem"
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white"
+          className="px-3 py-1.5 border border-white/10 rounded-md text-sm bg-slate-800 text-white"
         >
           {options.map((p) => (
             <option key={`${p.machine_type}|${p.defect_type}`} value={`${p.machine_type}|${p.defect_type}`}>
@@ -55,7 +55,7 @@ export function TrustPanel({ problems }: { problems: ProblemSummary[] }) {
             </option>
           ))}
         </select>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-slate-400">
           Fleet-level: scored by the same deterministic engine the analysis uses, over every recorded outcome (no machine weighting).
         </span>
       </div>
@@ -64,13 +64,13 @@ export function TrustPanel({ problems }: { problems: ProblemSummary[] }) {
       {!data && !error && <LoadingState label="Scoring every recorded outcome for this problem…" className="py-8" />}
       {data && (
         <div className="space-y-4">
-          <div className="rounded-lg bg-industrial-50 border border-industrial-100 p-4">
-            <p className="text-xs uppercase tracking-wide text-industrial-500 font-semibold">TRACE would recommend</p>
-            <p className="text-lg font-bold text-industrial-900">{data.recommendation.suggested_action}</p>
+          <div className="rounded-lg bg-[#38bdf8]/10 border border-[#38bdf8]/30 p-4">
+            <p className="text-xs uppercase tracking-wide text-[#38bdf8] font-semibold">TRACE would recommend</p>
+            <p className="text-lg font-bold text-white">{data.recommendation.suggested_action}</p>
             <div className="mt-2">
               <ConfidenceMeter confidence={data.recommendation.confidence as Confidence} successes={winner?.successes} attempts={winner?.attempts} />
             </div>
-            <p className="text-sm text-gray-700 mt-2">
+            <p className="text-sm text-slate-300 mt-2">
               {data.recommendation.basis} Evidence: {data.evidence_count} recorded outcomes.
             </p>
           </div>

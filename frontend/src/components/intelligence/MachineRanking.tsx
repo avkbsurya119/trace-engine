@@ -7,10 +7,10 @@ import type { MachineIntelligence } from "@/types/incident";
 import { CONFIDENCE_LABEL, Section } from "@/components/ui";
 
 const TONE = {
-  HIGH: "bg-green-100 text-green-800",
-  MEDIUM: "bg-amber-100 text-amber-800",
-  LOW: "bg-orange-100 text-orange-800",
-  INSUFFICIENT_DATA: "bg-gray-100 text-gray-700",
+  HIGH: "bg-green-900/20 text-green-300",
+  MEDIUM: "bg-amber-900/20 text-amber-300",
+  LOW: "bg-orange-900/20 text-orange-300",
+  INSUFFICIENT_DATA: "bg-slate-700/50 text-slate-300",
 } as const;
 
 /**
@@ -24,8 +24,8 @@ export function MachineRanking({ machines, onOpenMachine }: { machines: MachineI
   const rows = showAll ? machines : machines.slice(0, 10);
 
   return (
-    <Section icon={<Cpu className="w-5 h-5 text-industrial-600" />} title="Machine intelligence ranking" id="machines">
-      <p className="text-sm text-gray-600 -mt-2 mb-3">
+    <Section icon={<Cpu className="w-5 h-5 text-[#38bdf8]" />} title="Machine intelligence ranking" id="machines">
+      <p className="text-sm text-slate-400 -mt-2 mb-3">
         Ranked by problems with a fix proven on that machine, then verified outcomes, then success rate. Completeness is the share
         of its work orders with a verified outcome (worked, partial or failed).
       </p>
@@ -33,7 +33,7 @@ export function MachineRanking({ machines, onOpenMachine }: { machines: MachineI
         <table className="w-full text-sm">
           <caption className="sr-only">Machines ranked by accumulated knowledge</caption>
           <thead>
-            <tr className="text-left text-xs text-gray-500 border-b">
+            <tr className="text-left text-xs text-slate-400 border-b border-white/10">
               <th scope="col" className="py-1.5 pr-2 font-medium">#</th>
               <th scope="col" className="py-1.5 pr-2 font-medium">Machine</th>
               <th scope="col" className="py-1.5 px-2 font-medium text-right">Proven fixes</th>
@@ -56,7 +56,7 @@ export function MachineRanking({ machines, onOpenMachine }: { machines: MachineI
         </table>
       </div>
       {machines.length > 10 && (
-        <button type="button" onClick={() => setShowAll(!showAll)} className="mt-3 text-sm text-industrial-600 hover:text-industrial-800">
+        <button type="button" onClick={() => setShowAll(!showAll)} className="mt-3 text-sm text-[#38bdf8] hover:text-[#7dd3fc]">
           {showAll ? "Show top 10" : `Show all ${machines.length} machines`}
         </button>
       )}
@@ -78,11 +78,11 @@ function MachineRow({
   const panelId = `machine-intel-${m.machine_id}`;
   return (
     <>
-      <tr className={cn("border-b", isOpen && "bg-industrial-50/50")}>
-        <td className="py-2 pr-2 text-gray-400 tabular-nums">{m.rank}</td>
+      <tr className={cn("border-b border-white/10", isOpen && "bg-slate-700/30")}>
+        <td className="py-2 pr-2 text-slate-500 tabular-nums">{m.rank}</td>
         <th scope="row" className="py-2 pr-2 text-left">
-          <span className="font-medium text-gray-900">{m.machine_id}</span>
-          <span className="block text-xs font-normal text-gray-500">
+          <span className="font-medium text-white">{m.machine_id}</span>
+          <span className="block text-xs font-normal text-slate-400">
             {humanize(m.machine_type)} · {m.production_line}
           </span>
         </th>
@@ -101,35 +101,35 @@ function MachineRow({
             aria-expanded={isOpen}
             aria-controls={panelId}
             aria-label={`${isOpen ? "Hide" : "Show"} knowledge for ${m.machine_id}`}
-            className="p-1 rounded hover:bg-gray-100 text-gray-500"
+            className="p-1 rounded hover:bg-slate-700/50 text-slate-400"
           >
             {isOpen ? <ChevronUp className="w-4 h-4" aria-hidden /> : <ChevronDown className="w-4 h-4" aria-hidden />}
           </button>
         </td>
       </tr>
       {isOpen && (
-        <tr id={panelId} className="border-b bg-industrial-50/30">
+        <tr id={panelId} className="border-b border-white/10 bg-slate-700/20">
           <td />
           <td colSpan={8} className="py-3 pr-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {m.problems.map((p) => (
-                <div key={p.defect_type} className="rounded-md bg-white border border-gray-200 p-3 text-sm">
+                <div key={p.defect_type} className="rounded-md glass-pod border border-white/10 p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-gray-900">
-                      {humanize(p.defect_type)} <span className="text-gray-500 font-normal">· {p.occurrences}× here</span>
+                    <span className="font-medium text-white">
+                      {humanize(p.defect_type)} <span className="text-slate-400 font-normal">· {p.occurrences}× here</span>
                     </span>
                     <span className={cn("text-xs px-1.5 py-0.5 rounded", TONE[p.confidence])}>{CONFIDENCE_LABEL[p.confidence]}</span>
                   </div>
-                  <p className="text-xs text-gray-600 mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     TRACE would recommend: <strong>{p.recommended ?? "nothing (no proven fix)"}</strong> · from {p.fleet_evidence} outcomes fleet-wide
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5">
                     Proven on {m.machine_id}: {p.proven_here.length ? p.proven_here.join(", ") : "none yet"}
                   </p>
                 </div>
               ))}
             </div>
-            <button type="button" onClick={() => onOpenMachine(m.machine_id)} className="mt-3 text-sm font-medium text-industrial-600 hover:text-industrial-800">
+            <button type="button" onClick={() => onOpenMachine(m.machine_id)} className="mt-3 text-sm font-medium text-[#38bdf8] hover:text-[#7dd3fc]">
               Open {m.machine_id} memory timeline →
             </button>
           </td>

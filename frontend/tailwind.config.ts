@@ -23,19 +23,26 @@ const config: Config = {
         "grow-x": "grow-x 600ms cubic-bezier(0.22, 1, 0.36, 1) both",
       },
       colors: {
-        // Industrial color palette
+        // Deep navy color palette (matching liquid glass theme)
         industrial: {
-          50: "#f4f7f7",
-          100: "#e2ebea",
-          200: "#c8d9d7",
-          300: "#a1bfbc",
-          400: "#739d99",
-          500: "#58817e",
-          600: "#466968",
-          700: "#3b5656",
-          800: "#334748",
-          900: "#2d3d3e",
-          950: "#192526",
+          50: "#e8ecf4",
+          100: "#c4cce0",
+          200: "#9aa8c8",
+          300: "#7085b0",
+          400: "#506a9c",
+          500: "#3b5280",
+          600: "#2d4068",
+          700: "#1e2d4a",
+          800: "#131d33",
+          900: "#0a1628",
+          950: "#04060f",
+        },
+        // Navy glass backgrounds
+        navy: {
+          base: "#090d24",
+          card: "rgba(16, 24, 56, 0.38)",
+          panel: "rgba(12, 19, 46, 0.55)",
+          deep: "#04060f",
         },
         status: {
           success: "#22c55e",
