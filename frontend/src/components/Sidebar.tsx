@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { HealthStatus } from "@/types/incident";
 
-export type View = "dashboard" | "intelligence" | "report" | "analysis" | "memory";
+export type View = "landing" | "dashboard" | "intelligence" | "report" | "analysis" | "memory" | "sliders";
 
 interface SidebarProps {
   currentView: View;
