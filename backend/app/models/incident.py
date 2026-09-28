@@ -16,10 +16,10 @@ class ActionOutcome(str, Enum):
 class IncidentCreate(BaseModel):
     """Schema for creating a new incident."""
 
-    machine_id: str = Field(..., description="Unique identifier for the machine")
-    machine_type: str = Field(..., description="Type/category of machine")
-    production_line: str = Field(..., description="Production line identifier")
-    defect_type: str = Field(..., description="Type of defect observed")
+    machine_id: str = Field(..., min_length=1, description="Unique identifier for the machine")
+    machine_type: str = Field(..., min_length=1, description="Type/category of machine")
+    production_line: str = Field(..., min_length=1, description="Production line identifier")
+    defect_type: str = Field(..., min_length=1, description="Type of defect observed")
     symptoms: List[str] = Field(default_factory=list, description="Observed symptoms")
     sensor_values: Optional[Dict[str, Any]] = Field(
         default=None, description="Relevant sensor readings"
@@ -27,7 +27,7 @@ class IncidentCreate(BaseModel):
     operating_conditions: Optional[Dict[str, Any]] = Field(
         default=None, description="Operating conditions at time of incident"
     )
-    description: str = Field(..., description="Free-text incident description")
+    description: str = Field(..., min_length=1, description="Free-text incident description")
     suspected_root_cause: Optional[str] = Field(
         default=None, description="Initial suspected root cause"
     )
@@ -78,7 +78,7 @@ class Incident(IncidentCreate):
 class IncidentUpdate(BaseModel):
     """Schema for updating an incident with outcome."""
 
-    action_taken: str = Field(..., description="Action that was performed")
+    action_taken: str = Field(..., min_length=1, description="Action that was performed")
     action_outcome: ActionOutcome = Field(..., description="Result of the action")
     confirmed_root_cause: Optional[str] = Field(
         default=None, description="Verified root cause"
