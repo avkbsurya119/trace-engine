@@ -16,7 +16,7 @@ services:
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./trace.db
       - key: CORS_ORIGINS
-        value: '["https://trace-frontend.onrender.com", "http://localhost:3000"]'
+        value: '["https://trace-frontend-i5gp.onrender.com", "http://localhost:3000"]'
       - key: HINDSIGHT_API_URL
         value: https://api.hindsight.vectorize.io
       - key: HINDSIGHT_NAMESPACE
@@ -39,4 +39,4 @@ services:
       - key: NODE_VERSION
         value: "20"
       - key: NEXT_PUBLIC_API_URL
-        value: https://trace-api.onrender.com/api
+        value: https://trace-api-60le.onrender.com/api
