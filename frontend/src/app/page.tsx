@@ -175,7 +175,7 @@ export default function Home() {
     return (
       <main className="w-full h-screen fixed inset-0 overflow-hidden bg-[#04060f] z-50">
         <iframe
-          src="/index.html"
+          src="/landing.html"
           className="w-full h-full border-0"
           title="TRACE 3D Landing Page"
         />
