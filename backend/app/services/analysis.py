@@ -38,6 +38,11 @@ RECENCY_MEDIUM_DAYS = 240   # < 8 months = medium relevance
 
 def calculate_recency(incident_date: datetime, now: datetime) -> tuple[float, str, int]:
     """Calculate recency score and label for an incident."""
+    # Ensure both datetimes are timezone-aware (SQLite stores naive timestamps)
+    if incident_date.tzinfo is None:
+        incident_date = incident_date.replace(tzinfo=timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
     days_ago = (now - incident_date).days
     if days_ago < 0:
         days_ago = 0
