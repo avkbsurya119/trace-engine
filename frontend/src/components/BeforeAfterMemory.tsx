@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { cn, formatDay, formatHours, getOutcomeBgColor, humanize } from "@/lib/utils";
 import type { HeroMachine } from "@/types/incident";
-import { CONFIDENCE_LABEL, ConfidenceMeter, type Confidence } from "@/components/ui";
+import { CONFIDENCE_LABEL, ConfidenceMeter, ErrorState, LoadingState, type Confidence } from "@/components/ui";
 import {
   Brain,
   AlertTriangle,
@@ -16,7 +16,6 @@ import {
   Zap,
   ArrowRight,
   HelpCircle,
-  Loader2,
 } from "lucide-react";
 
 interface Props {
@@ -116,14 +115,14 @@ export function BeforeAfterMemory({ onClose, onViewMachineMemory }: Props) {
         </div>
 
         {!hero ? (
-          <div className="p-12 flex flex-col items-center text-gray-500">
+          <div className="p-6">
             {error ? (
-              <p className="text-red-700">{error}</p>
+              <ErrorState
+                title="The live comparison could not run"
+                detail={`${error} It needs Hindsight recall; the rest of TRACE Intelligence works without it.`}
+              />
             ) : (
-              <>
-                <Loader2 className="w-8 h-8 animate-spin mb-3" />
-                <p className="text-sm">Running recall and scoring for the hero machines...</p>
-              </>
+              <LoadingState label="Recalling memory and scoring each showcase machine, with and without memory…" />
             )}
           </div>
         ) : (

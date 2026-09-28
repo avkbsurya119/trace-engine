@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { humanize } from "@/lib/utils";
 import type { ProblemKnowledge, ProblemSummary } from "@/types/incident";
-import { ConfidenceMeter, Section, type Confidence } from "@/components/ui";
+import { ConfidenceMeter, ErrorState, LoadingState, Section, type Confidence } from "@/components/ui";
 import { WhyPanel } from "@/components/analysis/WhyPanel";
 
 /** Pick any problem: see what TRACE would recommend from all recorded outcomes, and exactly why. */
@@ -60,12 +60,8 @@ export function TrustPanel({ problems }: { problems: ProblemSummary[] }) {
         </span>
       </div>
 
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      {!data && !error && (
-        <p className="flex items-center gap-2 text-sm text-gray-500" role="status">
-          <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Scoring…
-        </p>
-      )}
+      {error && <ErrorState title="Could not score this problem" detail={error} />}
+      {!data && !error && <LoadingState label="Scoring every recorded outcome for this problem…" className="py-8" />}
       {data && (
         <div className="space-y-4">
           <div className="rounded-lg bg-industrial-50 border border-industrial-100 p-4">

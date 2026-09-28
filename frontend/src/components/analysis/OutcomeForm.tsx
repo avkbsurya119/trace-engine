@@ -5,7 +5,7 @@ import { ArrowRight, Brain, CheckCircle, Loader2, Save } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn, getOutcomeBgColor, humanize } from "@/lib/utils";
 import type { ActionOutcome, AnalysisResult, IncidentUpdate } from "@/types/incident";
-import { Section } from "@/components/ui";
+import { ErrorState, Section } from "@/components/ui";
 
 const OUTCOMES: ActionOutcome[] = ["SUCCESS", "PARTIAL", "FAILED", "UNKNOWN"];
 
@@ -134,11 +134,7 @@ export function OutcomeForm({ result }: { result: AnalysisResult }) {
             save();
           }}
         >
-          {error && (
-            <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm">
-              {error}
-            </div>
-          )}
+          {error && <ErrorState title="The outcome was not saved" detail={error} />}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="block text-sm font-medium text-gray-700">

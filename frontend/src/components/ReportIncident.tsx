@@ -5,12 +5,14 @@ import { api } from "@/lib/api";
 import { humanize } from "@/lib/utils";
 import type { IncidentCreate, AnalysisResult, Fleet } from "@/types/incident";
 import { AnalysisProgress } from "@/components/analysis/AnalysisProgress";
-import { AlertTriangle, X, Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Search } from "lucide-react";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, CARD, ErrorState, PageHeader } from "@/components/ui";
+import { usePresentation } from "@/components/JudgeMode";
 
 interface ReportIncidentProps {
   onAnalysisComplete: (result: AnalysisResult) => void;
   onCancel: () => void;
-  /** Pre-filled incident (demo guide). */
+  /** Pre-filled incident (Judge mode or demo preset). */
   preset?: IncidentCreate | null;
 }
 
@@ -41,6 +43,7 @@ export function ReportIncident({
   const [formData, setFormData] = useState<IncidentCreate>({ ...EMPTY_INCIDENT, ...(preset ?? {}) });
 
   const [customSymptom, setCustomSymptom] = useState("");
+  const presenting = usePresentation();
   const [fleet, setFleet] = useState<Fleet | null>(null);
   const [defectChoice, setDefectChoice] = useState(preset?.defect_type ?? "");
   const [newDefect, setNewDefect] = useState("");
@@ -126,35 +129,19 @@ export function ReportIncident({
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-amber-500" />
-            <h2 className="text-xl font-bold text-industrial-900">
-              Report Incident
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label="Close report form"
-            className="p-2 text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-5 h-5" aria-hidden />
-          </button>
-        </div>
-
+    <div className="max-w-3xl mx-auto space-y-6">
+      <PageHeader
+        question="What happened?"
+        title="Report incident"
+        breadcrumb={[{ label: "Dashboard", onClick: onCancel }, { label: "Report incident" }]}
+        subtitle="Describe the problem as the operator saw it. TRACE searches memory for similar work orders as soon as you analyze."
+      />
+      <div className={CARD}>
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {error && (
-            <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-              {error}
-            </div>
-          )}
+          {error && <ErrorState title="The incident could not be analyzed" detail={error} />}
 
-          {fleet && fleet.demo_presets.length > 0 && (
+          {fleet && fleet.demo_presets.length > 0 && !presenting && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-industrial-50 border border-industrial-100 px-3 py-2">
               <label htmlFor="demo-preset" className="text-sm text-industrial-800 font-medium">
                 Load a demo incident
@@ -364,26 +351,12 @@ export function ReportIncident({
 
           {/* Submit */}
           <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900"
-            >
+            <button type="button" onClick={onCancel} className={BUTTON_SECONDARY}>
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 bg-industrial-600 text-white rounded-lg hover:bg-industrial-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                "Analyze Incident"
-              )}
+            <button type="submit" disabled={loading} className={BUTTON_PRIMARY}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Search className="w-4 h-4" aria-hidden />}
+              {loading ? "Consulting memory…" : "Analyze incident"}
             </button>
           </div>
         </form>

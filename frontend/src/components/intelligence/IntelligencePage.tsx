@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Brain, Loader2, RefreshCw } from "lucide-react";
+import { Brain, GitCompare, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import type { IntelligenceReport } from "@/types/incident";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, EmptyState, ErrorState, LoadingState, PageHeader } from "@/components/ui";
+import { usePresentation } from "@/components/JudgeMode";
 import { KnowledgeOverview } from "./Overview";
 import { MemoryImpactHero } from "./MemoryImpactHero";
 import { KnowledgeEvolution } from "./Evolution";
@@ -19,7 +21,7 @@ import { MachineRanking } from "./MachineRanking";
 // The network is the heaviest visual and sits at the bottom: load it on demand.
 const KnowledgeNetwork = dynamic(() => import("./KnowledgeNetwork").then((m) => m.KnowledgeNetwork), {
   ssr: false,
-  loading: () => <p className="text-sm text-gray-500 p-6">Loading knowledge network…</p>,
+  loading: () => <LoadingState label="Loading knowledge network…" />,
 });
 
 const SECTIONS = [
@@ -38,7 +40,14 @@ const SECTIONS = [
  * TRACE Intelligence: the factory's accumulated memory, computed by the backend
  * from recorded work orders and the deterministic recommendation engine.
  */
-export function IntelligencePage({ onViewMachineMemory }: { onViewMachineMemory: (machineId: string) => void }) {
+export function IntelligencePage({
+  onViewMachineMemory,
+  onCompare,
+}: {
+  onViewMachineMemory: (machineId: string) => void;
+  onCompare: () => void;
+}) {
+  const presenting = usePresentation();
   const [report, setReport] = useState<IntelligenceReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,7 +58,7 @@ export function IntelligencePage({ onViewMachineMemory }: { onViewMachineMemory:
     api
       .getIntelligence({ refresh })
       .then(setReport)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
+      .catch((e) => setError(e instanceof Error ? e.message : "The backend did not respond."))
       .finally(() => setRefreshing(false));
   };
 
@@ -57,43 +66,40 @@ export function IntelligencePage({ onViewMachineMemory }: { onViewMachineMemory:
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="flex items-center gap-2 text-xs uppercase tracking-wide font-semibold text-industrial-500">
-            <Brain className="w-4 h-4" aria-hidden /> TRACE Intelligence
-          </p>
-          <h2 className="text-2xl font-bold text-industrial-900 mt-1">What the factory's memory has learned</h2>
-          <p className="text-industrial-600 mt-1">TRACE remembers · TRACE learns · TRACE explains · TRACE improves</p>
-        </div>
-        {report && (
-          <div className="text-right text-xs text-gray-500">
-            <p>Computed from {report.overview.total_incidents.toLocaleString()} work orders · {formatDate(report.generated_at)}</p>
-            <button
-              type="button"
-              onClick={() => load(true)}
-              disabled={refreshing}
-              className="mt-1 inline-flex items-center gap-1 text-industrial-600 hover:text-industrial-800 disabled:opacity-50"
-            >
-              <RefreshCw className={refreshing ? "w-3.5 h-3.5 animate-spin" : "w-3.5 h-3.5"} aria-hidden /> Refresh
+      <PageHeader
+        question="What has TRACE learned?"
+        title="TRACE Intelligence"
+        subtitle={
+          <>
+            TRACE remembers · learns · explains · improves.
+            {report && (
+              <span className="block text-xs text-gray-500 mt-0.5">
+                Computed from {report.overview.total_incidents.toLocaleString()} work orders · {formatDate(report.generated_at)}
+              </span>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <button type="button" onClick={onCompare} className={BUTTON_PRIMARY}>
+              <GitCompare className="w-4 h-4" aria-hidden /> With vs without memory
             </button>
-          </div>
-        )}
-      </header>
+            {report && !presenting && (
+              <button type="button" onClick={() => load(true)} disabled={refreshing} className={BUTTON_SECONDARY}>
+                <RefreshCw className={refreshing ? "w-4 h-4 animate-spin" : "w-4 h-4"} aria-hidden /> Refresh
+              </button>
+            )}
+          </>
+        }
+      />
 
-      {error && (
-        <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-          {error}
-        </div>
-      )}
-
-      {!report && !error && (
-        <div className="flex items-center gap-2 text-gray-500 py-16 justify-center" role="status">
-          <Loader2 className="w-6 h-6 animate-spin" aria-hidden /> Reading accumulated memory…
-        </div>
-      )}
+      {error && <ErrorState title="Could not compute TRACE Intelligence" detail={error} onRetry={() => load(true)} />}
+      {!report && !error && <LoadingState label="Reading the factory's accumulated memory…" />}
 
       {report && report.overview.total_incidents === 0 && (
-        <p className="text-gray-600">Memory is empty. Report an incident and record its outcome to start building knowledge.</p>
+        <EmptyState icon={<Brain className="w-6 h-6" />} title="Memory is empty">
+          Report an incident and record its outcome; every recorded repair becomes knowledge this page summarises.
+        </EmptyState>
       )}
 
       {report && report.overview.total_incidents > 0 && (

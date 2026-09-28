@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeft, Database, FileText } from "lucide-react";
+import { Database, FileText } from "lucide-react";
 import { formatDate, humanize } from "@/lib/utils";
 import type { AnalysisResult } from "@/types/incident";
-import { Field, Section } from "@/components/ui";
+import { BUTTON_SECONDARY, Field, PageHeader, Section } from "@/components/ui";
 import { DecisionSummary } from "@/components/analysis/DecisionSummary";
 import { DecisionPipeline } from "@/components/analysis/DecisionPipeline";
 import { WhyPanel } from "@/components/analysis/WhyPanel";
@@ -26,32 +26,18 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Back to dashboard"
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-          >
-            <ArrowLeft className="w-5 h-5" aria-hidden />
+      <PageHeader
+        question="What should I do?"
+        title={`${incident.machine_id}: ${humanize(incident.defect_type)}`}
+        breadcrumb={[{ label: "Dashboard", onClick: onBack }, { label: "Report incident" }, { label: incident.incident_id }]}
+        subtitle={`Incident ${incident.incident_id} · ${humanize(incident.machine_type)} · ${incident.production_line}`}
+        actions={
+          <button type="button" onClick={() => onViewMachineMemory(incident.machine_id)} className={BUTTON_SECONDARY}>
+            <Database className="w-4 h-4" aria-hidden />
+            {incident.machine_id} history
           </button>
-          <div>
-            <h2 className="text-2xl font-bold text-industrial-900">Incident Analysis</h2>
-            <p className="text-industrial-600">
-              {incident.incident_id} · {incident.machine_id} · {humanize(incident.defect_type)}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => onViewMachineMemory(incident.machine_id)}
-          className="flex items-center gap-2 px-4 py-2 text-industrial-600 hover:text-industrial-800 hover:bg-industrial-50 rounded-lg"
-        >
-          <Database className="w-5 h-5" aria-hidden />
-          {incident.machine_id} memory
-        </button>
-      </header>
+        }
+      />
 
       <DecisionSummary result={result} />
       <DecisionPipeline result={result} />
