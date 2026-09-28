@@ -116,6 +116,11 @@ class HindsightClient:
         except Exception:
             return False
 
+    async def check_bank(self) -> None:
+        """Raise if Hindsight is unreachable, the key is rejected, or the bank is missing."""
+
+        await self._client.aget_bank_config(bank_id=self.bank_id)
+
     async def delete_bank(self) -> None:
         try:
             await self._client.adelete_bank(bank_id=self.bank_id)
