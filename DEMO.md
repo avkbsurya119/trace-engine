@@ -23,6 +23,8 @@ Open http://localhost:3000. To rehearse the memory loop without the UI: `python 
 
 **Fast path:** the dashboard's **Demo guide** has one button per step (see memory impact, load incident 1, load incident 2, open machine memory), and the Report form has a *Load a demo incident* picker, so nothing needs to be typed live. The presets are the same records `scripts/demo.py` uses.
 
+**Close on TRACE Intelligence (sidebar):** the memory-impact replay (58% vs 48% when the action matched memory), knowledge evolution (problems TRACE can answer 11 → 24), the trust panel, and the knowledge network. Everything there is computed from the work orders and the same deterministic engine.
+
 **What to point at on the analysis page:** the decision summary (confidence meter with "N of M recorded attempts worked"), *How TRACE reached this decision* (click *Memory retrieval* to show the two tag-filtered recalls), *Why this recommendation* (confidence checklist + why each alternative lost), and the dashed AI box (wording only).
 
 ---

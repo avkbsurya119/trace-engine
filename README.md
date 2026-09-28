@@ -10,6 +10,7 @@ When a new incident is reported, TRACE recalls similar past work orders from **H
 - [How Hindsight memory is used](#how-hindsight-memory-is-used)
 - [Dataset](#dataset)
 - [Hero machines](#hero-machines)
+- [TRACE Intelligence](#trace-intelligence)
 - [Quick start](#quick-start)
 - [Configuration](#configuration)
 - [API reference](#api-reference)
@@ -31,6 +32,8 @@ flowchart LR
     GATE --> SCORE[Deterministic scoring<br/>+ confidence checks]
     SCORE --> LLM[Groq<br/>wording only]
     LLM --> UI
+    UI -->|GET /intelligence| INTEL[Intelligence service<br/>replay + engine, read-only]
+    INTEL --> DB
     UI -->|PATCH /outcome| API
     API -->|update| DB
     API -->|retain, replace| HS
@@ -103,6 +106,30 @@ Three showcase machines have scripted chains in the history (`generator.STORIES`
 
 The dashboard's **See Memory Impact** modal (`BeforeAfterMemory.tsx`, `GET /api/dashboard/hero-machines`) runs each hero incident live through the same deterministic scorer twice — once with no evidence, once with Hindsight recall — and shows what trial and error actually cost that machine (attempts that didn't work and their downtime, from SQLite). Nothing in the modal is hardcoded and nothing is stored.
 
+## TRACE Intelligence
+
+The **TRACE Intelligence** page (sidebar) is the visual representation of the factory's accumulated memory: what TRACE has learned, how that knowledge grew, and why its recommendations can be trusted. It is read-only and computed entirely by the backend (`backend/app/services/intelligence.py`) from the SQLite work orders plus the **unchanged** recommendation engine. No LLM is involved and nothing is invented; anything that can't be computed from the data isn't shown.
+
+Two computations do the work:
+
+- **Knowledge per problem**: the engine scores every (equipment type, problem) over all recorded outcomes, giving a fleet-level answer and confidence.
+- **Chronological replay**: every work order is compared with what memory held *before* it (earlier outcomes for the same problem and equipment type). Individual recalls aren't logged, so replay is the honest way to measure availability and reuse; the page says so.
+
+| Section | What it shows (all computed) |
+|---|---|
+| Knowledge overview | Work orders, machines, equipment types, outcomes (worked / partial / failed / unverified), knowledge coverage (problems with a proven fix), knowledge age, and how many problems TRACE answers at each confidence level. A distribution, because averaging HIGH/LOW would be meaningless |
+| Memory impact | Without vs with memory, plus the replay result: when the technician's action matched what memory would have recommended, **58%** worked (median downtime 3.1 h) vs **48%** (3.8 h) when a different action was taken. First occurrences (n=26) are shown separately with the caveat that they aren't a like-for-like comparison |
+| Knowledge evolution | Month-by-month small multiples: outcomes in memory, problems TRACE can answer (11 → 24 of 25), problems answered with HIGH confidence, share of new work orders that already had memory (57% → 100%) |
+| Memory growth | Knowledge before → work order recorded → knowledge after, plus the latest confidence changes. Downgrades after failed or partial repairs are shown too |
+| Memory reuse | Share of work orders with earlier evidence (same machine vs fleet-only), repairs memory recommended most often, past work orders cited most as evidence |
+| Recommendation trust | Pick any problem: the engine's fleet-level recommendation with the same confidence checklist and verdicts the analysis page uses (reuses `WhyPanel`) |
+| Most reliable repairs | Ranked by the 95% Wilson lower bound of the success rate (≥ 5 attempts), with attempts, outcomes and sample strength, so a 2-for-2 fix never outranks 12-for-14. Also lists the least reliable |
+| Failure patterns | Most common problems with outcomes and monthly trend, recurring problems per machine, breakdown by equipment type |
+| Machine ranking | Machines ranked by problems with a fix proven on that machine, then verified outcomes and success rate; each row expands to per-problem knowledge and links to the machine timeline |
+| Knowledge network | Interactive machines → problems → repairs → outcomes graph per equipment type (line width = work orders, ★ = currently recommended), with a text alternative; loaded lazily |
+
+The report is cached on the server and recomputed only when a work order is added or an outcome changes (~100 ms for 567 work orders); the frontend caches it per session and invalidates it after an analysis or recorded outcome.
+
 ## Quick start
 
 ```bash
@@ -164,6 +191,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api
 | GET | `/api/dashboard/stats` | Counts, outcome / defect / machine-type distributions, downtime, history range, memory bank, `memory_growth` (work orders and cumulative outcomes per month) |
 | GET | `/api/dashboard/fleet` | Machine types, machines, defect types + symptoms, intervention categories, hero machine per type (drives the forms), `demo_presets` and `demo_outcome` (shared with `scripts/demo.py`) |
 | GET | `/api/dashboard/hero-machines` | Live with/without-memory comparison for the hero machines |
+| GET | `/api/intelligence` | TRACE Intelligence report: overview, evolution, memory impact, reuse, machines, failure patterns, reliable repairs, knowledge changes, network, per-problem knowledge. Cached until the data changes |
+| GET | `/api/intelligence/problem?machine_type=&defect_type=[&machine_id=]` | The engine's recommendation for one problem over all recorded outcomes (optionally weighted for a machine), with confidence checks and verdicts |
 | GET | `/api/dashboard/health` | Checks SQLite, the Hindsight bank (with the configured key) and LLM configuration, and reports the last real memory failure (e.g. exhausted credits, which reading the bank config does not reveal); `healthy` or `degraded`, cached 30 s. Drives the sidebar status |
 
 Errors are JSON `{"detail": ...}`: 404 unknown incident, 422 invalid input, 503 when Hindsight is unreachable, with the readable reason extracted from the SDK error (e.g. `Hindsight 402: Insufficient credits…`). Nothing is saved on a 503: a failed memory write rolls the SQLite change back.
@@ -196,7 +225,7 @@ Accessibility: dialog semantics, Esc and focus return for the modal, labelled ic
 
 ```bash
 cd backend
-pytest                      # 65 offline tests, ~2 s: temp SQLite + in-memory Hindsight fake, no LLM
+pytest                      # 73 offline tests, ~2 s: temp SQLite + in-memory Hindsight fake, no LLM
 TRACE_LIVE=1 pytest -m live # 4 live tests against the running API with real Hindsight + Groq (~2 min)
 
 cd frontend
@@ -207,6 +236,7 @@ npm run typecheck
 |---|---|
 | `tests/test_recommendation.py` | Scoring and confidence rules, same-machine rule, downgrade, warnings, no action without evidence, confidence checklist, a reason for every rejected alternative, attempts / success rate |
 | `tests/test_insights.py` | Recency bands, recurring-pattern detection, cross-machine evidence |
+| `tests/test_intelligence.py` | Wilson ranking, replay uses only earlier outcomes, confidence changes over time, reuse counts, fleet-level trust view, endpoint vs frontend types, cache invalidation, problem endpoint |
 | `tests/test_evidence_gate.py` | Relevance gate, same-machine-first ordering, evidence cap |
 | `tests/test_phrasing.py` | LLM wording only: fallback on no key / error / empty reply / invented incident ID / no admission of missing evidence |
 | `tests/test_dataset.py` | Generator is deterministic, sizes, IDs, timestamps, operating hours, mixed outcomes, hero chains |
