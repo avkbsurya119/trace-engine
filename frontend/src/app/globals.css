@@ -3,18 +3,161 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 244, 247, 247;
-  --background-end-rgb: 255, 255, 255;
+  --bg: #090d24;
+  --card-bg: rgba(16, 24, 56, 0.38);
+  --ink: #ffffff;
+  --muted: #94a3b8;
+  --muted-2: #64748b;
+  --accent: #38bdf8;
+  --accent-blue: #3b82f6;
+  --accent-glow: rgba(56, 189, 248, 0.45);
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
-  min-height: 100vh;
+@layer base {
+  body {
+    color: var(--ink);
+    background-color: var(--bg);
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* Sleek modern translucent glass scrollbar */
+  ::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(56, 189, 248, 0.5);
+  }
+}
+
+@layer utilities {
+  /* True Liquid Frosted Glass (Windows 11 Acrylic / visionOS Glass) */
+  .glass-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%), rgba(12, 19, 46, 0.42);
+    backdrop-filter: blur(30px) saturate(210%);
+    -webkit-backdrop-filter: blur(30px) saturate(210%);
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.36) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-shadow: 
+      0 20px 50px -10px rgba(0, 0, 0, 0.55),
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -1px 1px 0 rgba(0, 0, 0, 0.25);
+    border-radius: 1.5rem;
+  }
+
+  .glass-card-hover {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .glass-card-hover:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.04) 100%), rgba(18, 28, 64, 0.48);
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    border-top-color: rgba(255, 255, 255, 0.5) !important;
+    transform: translateY(-2px);
+    box-shadow: 
+      0 26px 60px -12px rgba(0, 0, 0, 0.65), 
+      0 0 35px rgba(56, 189, 248, 0.22),
+      inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  .glass-panel {
+    background: linear-gradient(180deg, rgba(16, 25, 58, 0.52) 0%, rgba(10, 16, 40, 0.65) 100%);
+    backdrop-filter: blur(36px) saturate(210%);
+    -webkit-backdrop-filter: blur(36px) saturate(210%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.22);
+  }
+
+  /* Sunken inner glass pod for widgets & telemetry */
+  .glass-pod {
+    background: rgba(6, 11, 28, 0.38);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+    border-radius: 1rem;
+  }
+
+  .glass-input {
+    background: rgba(8, 14, 36, 0.48);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-top: 1px solid rgba(255, 255, 255, 0.26);
+    color: #ffffff;
+    border-radius: 1rem;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35);
+    transition: all 0.2s ease;
+  }
+  .glass-input:focus {
+    outline: none;
+    background: rgba(12, 20, 48, 0.65);
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35), inset 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-neon-primary {
+    background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+    color: #ffffff;
+    font-weight: 600;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 22px rgba(56, 189, 248, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.45);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn-neon-primary:hover {
+    box-shadow: 0 6px 30px rgba(56, 189, 248, 0.65), inset 0 1px 1.5px rgba(255, 255, 255, 0.65);
+    transform: translateY(-1px);
+    background: linear-gradient(135deg, #7dd3fc 0%, #3b82f6 100%);
+  }
+
+  .btn-neon-outline {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-top: 1px solid rgba(255, 255, 255, 0.32);
+    color: #ffffff;
+    border-radius: 9999px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    transition: all 0.2s ease;
+  }
+  .btn-neon-outline:hover {
+    background: rgba(56, 189, 248, 0.16);
+    border-color: rgba(56, 189, 248, 0.5);
+    border-top-color: rgba(255, 255, 255, 0.55);
+    color: #ffffff;
+    box-shadow: 0 0 24px rgba(56, 189, 248, 0.35);
+  }
+
+  .neon-text-blue {
+    color: #38bdf8;
+    text-shadow: 0 0 16px rgba(56, 189, 248, 0.6);
+  }
+
+  .neon-text-mint {
+    color: #38bdf8;
+    text-shadow: 0 0 16px rgba(56, 189, 248, 0.6);
+  }
+
+  /* Vibrant liquid silk wallpaper behind the frosted glass (matching reference image) */
+  .liquid-glass-wallpaper {
+    background: 
+      radial-gradient(ellipse 95% 75% at 75% 20%, rgba(37, 99, 235, 0.4) 0%, transparent 65%),
+      radial-gradient(ellipse 85% 65% at 15% 85%, rgba(124, 58, 237, 0.35) 0%, transparent 65%),
+      radial-gradient(circle 550px at 45% 45%, rgba(14, 165, 233, 0.22) 0%, transparent 70%),
+      linear-gradient(135deg, #06091e 0%, #0c1334 26%, #131d4e 52%, #171642 75%, #070a1c 100%);
+    background-attachment: fixed;
+  }
 }
