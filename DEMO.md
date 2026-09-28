@@ -21,7 +21,7 @@ cd backend && python -m scripts.demo --reset
 
 Open http://localhost:3000. To rehearse the memory loop without the UI: `python -m scripts.demo --runs 3`.
 
-**Fast path:** the dashboard's **Demo guide** has one button per step (see memory impact, load incident 1, load incident 2, open machine memory), and the Report form has a *Load a demo incident* picker, so nothing needs to be typed live. The presets are the same records `scripts/demo.py` uses.
+**Fast path: Judge mode.** Click **Judge mode** in the sidebar (or open `http://localhost:3000/?judge=1`). A presenter bar walks the six steps with *Next* / *Back* or the arrow keys: dashboard → with vs without memory → incident 1 (pre-filled) → incident 2 (pre-filled) → machine history → TRACE Intelligence. Nothing needs to be typed live; the incidents are the same presets `scripts/demo.py` uses. Outside Judge mode, the Report form keeps a *Load a demo incident* picker.
 
 **Close on TRACE Intelligence (sidebar):** the memory-impact replay (58% vs 48% when the action matched memory), knowledge evolution (problems TRACE can answer 11 → 24), the trust panel, and the knowledge network. Everything there is computed from the work orders and the same deterministic engine.
 
@@ -35,9 +35,9 @@ Open http://localhost:3000. To rehearse the memory loop without the UI: `python 
 - The subtitle states the history is synthetic but operationally realistic.
 - Outcome mix: roughly half the repairs worked; failed and partial repairs are kept as evidence.
 
-## Scene 2: Memory impact on the hero machines
+## Scene 2: With vs without memory on the showcase machines
 
-1. Click **See Memory Impact**.
+1. Open **TRACE Intelligence** and click **With vs without memory** (Judge mode step 2 does this for you).
 2. Walk the three tabs: **CNC-204** spindle vibration, **HP-303** pressure loss, **CV-507** belt mistracking.
 
 **Expected (computed live, nothing stored):**
