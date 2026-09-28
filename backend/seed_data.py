@@ -37,7 +37,8 @@ def make_incident(
 
 SEED_DATA = [
     # ============================================================
-    # CNC - SURFACE ROUGHNESS
+    # HERO MACHINE 1: CNC-01 - Rich history with surface roughness
+    # Shows the learning progression: failed → partial → success
     # ============================================================
 
     (
@@ -62,7 +63,7 @@ SEED_DATA = [
             },
             "Machined surface became rough with elevated spindle vibration.",
             "excessive spindle speed",
-            5000,
+            10000,  # 7 days ago - first incident
         ),
         IncidentUpdate(
             action_taken="Reduced spindle speed to 3500 RPM",
@@ -73,6 +74,150 @@ SEED_DATA = [
             technician_notes="Spindle vibration dropped after reducing speed.",
         ),
     ),
+
+    # CNC-01 second incident - tool wear (different defect type)
+    (
+        make_incident(
+            "TRC-CNC-001-B",
+            "CNC-01",
+            "CNC",
+            "LINE-A",
+            "tool_wear",
+            [
+                "dimensional drift",
+                "tool marks visible",
+            ],
+            {
+                "cutting_force": 68,
+                "tool_age_hours": 142,
+                "spindle_speed": 3500,
+            },
+            {
+                "material": "aluminium",
+                "coolant": "ON",
+            },
+            "Parts showing dimensional drift and visible tool marks on CNC-01.",
+            "worn cutting insert",
+            8500,  # 6 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Replaced cutting insert",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Worn cutting insert",
+            resolution_details="Dimensional accuracy restored, tool marks eliminated.",
+            resolution_time_minutes=15,
+            technician_notes="Insert showed flank wear > 0.3mm.",
+        ),
+    ),
+
+    # CNC-01 third incident - surface roughness returns (memory should recall first fix)
+    (
+        make_incident(
+            "TRC-CNC-001-C",
+            "CNC-01",
+            "CNC",
+            "LINE-A",
+            "surface_roughness",
+            [
+                "rough surface finish",
+                "chatter marks",
+            ],
+            {
+                "spindle_vibration": 7.8,
+                "spindle_speed": 4100,
+                "feed_rate": 330,
+            },
+            {
+                "material": "aluminium",
+                "coolant": "ON",
+            },
+            "Surface roughness reappeared after maintenance, chatter visible.",
+            "speed increased after maintenance",
+            5500,  # 4 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Reduced spindle speed to 3400 RPM",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Spindle speed too high post-maintenance",
+            resolution_details="Chatter eliminated, surface finish within spec.",
+            resolution_time_minutes=12,
+            technician_notes="Maintenance team had reset to default speed. Memory helped identify quickly.",
+        ),
+    ),
+
+    # CNC-01 fourth incident - vibration anomaly (new defect, building knowledge)
+    (
+        make_incident(
+            "TRC-CNC-001-D",
+            "CNC-01",
+            "CNC",
+            "LINE-A",
+            "vibration_anomaly",
+            [
+                "unusual vibration pattern",
+                "intermittent noise",
+            ],
+            {
+                "spindle_vibration": 9.2,
+                "spindle_speed": 3400,
+                "bearing_temperature": 62,
+            },
+            {
+                "material": "steel",
+                "coolant": "ON",
+            },
+            "Unusual vibration detected even at reduced speeds on CNC-01.",
+            "bearing issue or spindle imbalance",
+            2800,  # 2 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Replaced spindle bearings",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Worn spindle bearings",
+            resolution_details="Vibration returned to normal levels across all speeds.",
+            resolution_time_minutes=120,
+            technician_notes="Bearings showed wear patterns. Preventive replacement scheduled for other CNCs.",
+        ),
+    ),
+
+    # CNC-01 fifth incident - most recent, surface roughness (TRACE now has rich history)
+    (
+        make_incident(
+            "TRC-CNC-001-E",
+            "CNC-01",
+            "CNC",
+            "LINE-A",
+            "surface_roughness",
+            [
+                "rough surface finish",
+                "slight vibration",
+            ],
+            {
+                "spindle_vibration": 6.5,
+                "spindle_speed": 4000,
+                "feed_rate": 310,
+            },
+            {
+                "material": "aluminium",
+                "coolant": "ON",
+            },
+            "Minor surface roughness detected during quality check on CNC-01.",
+            "unknown",
+            1200,  # Recent - 20 hours ago
+        ),
+        IncidentUpdate(
+            action_taken="Reduced spindle speed to 3500 RPM per TRACE recommendation",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Spindle speed slightly elevated",
+            resolution_details="Surface finish improved immediately. TRACE memory was accurate.",
+            resolution_time_minutes=8,
+            technician_notes="Used TRACE recommendation - fastest resolution yet for this machine.",
+        ),
+    ),
+
+    # ============================================================
+    # CNC - Other machines (spread for variety)
+    # ============================================================
 
     (
         make_incident(
@@ -181,7 +326,8 @@ SEED_DATA = [
     ),
 
     # ============================================================
-    # INJECTION MOLDING - SHORT SHOT
+    # HERO MACHINE 2: IMM-01 - Injection Molding with rich history
+    # Shows defect pattern recognition and intervention learning
     # ============================================================
 
     (
@@ -206,7 +352,7 @@ SEED_DATA = [
             },
             "Parts were incompletely filled near the far end of the mold.",
             "insufficient injection pressure",
-            2900,
+            9500,  # 6.5 days ago - first incident
         ),
         IncidentUpdate(
             action_taken="Increased injection pressure to 96 bar",
@@ -217,6 +363,150 @@ SEED_DATA = [
             technician_notes="Part weight returned to specification.",
         ),
     ),
+
+    # IMM-01 second incident - flash defect (different problem)
+    (
+        make_incident(
+            "TRC-IMM-001-B",
+            "IMM-01",
+            "Injection_Molding",
+            "LINE-C",
+            "flash_defect",
+            [
+                "excess material at parting line",
+                "sharp edges",
+            ],
+            {
+                "injection_pressure": 98,
+                "melt_temperature": 220,
+                "clamp_force": 145,
+            },
+            {
+                "material": "ABS",
+                "ambient_temperature": 26,
+            },
+            "Flash appearing at mold parting line on IMM-01.",
+            "clamp force too low or pressure too high",
+            7800,  # 5 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Reduced injection pressure to 92 bar",
+            action_outcome=ActionOutcome.PARTIAL,
+            confirmed_root_cause=None,
+            resolution_details="Flash reduced but not eliminated.",
+            resolution_time_minutes=18,
+            technician_notes="May need to increase clamp force as well.",
+        ),
+    ),
+
+    # IMM-01 third incident - flash resolved with clamp force
+    (
+        make_incident(
+            "TRC-IMM-001-C",
+            "IMM-01",
+            "Injection_Molding",
+            "LINE-C",
+            "flash_defect",
+            [
+                "excess material at parting line",
+                "thin flash",
+            ],
+            {
+                "injection_pressure": 92,
+                "melt_temperature": 218,
+                "clamp_force": 145,
+            },
+            {
+                "material": "ABS",
+                "ambient_temperature": 27,
+            },
+            "Flash still present after pressure reduction on IMM-01.",
+            "clamp force insufficient",
+            6200,  # 4 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Increased clamp force to 165 tons",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Insufficient clamp force",
+            resolution_details="Flash eliminated completely. Optimal settings documented.",
+            resolution_time_minutes=22,
+            technician_notes="Combined learning: pressure 92 bar + clamp 165 tons = optimal for ABS.",
+        ),
+    ),
+
+    # IMM-01 fourth incident - short shot returns (TRACE should recall first fix)
+    (
+        make_incident(
+            "TRC-IMM-001-D",
+            "IMM-01",
+            "Injection_Molding",
+            "LINE-C",
+            "short_shot",
+            [
+                "incomplete filling",
+                "voids at flow end",
+            ],
+            {
+                "injection_pressure": 85,
+                "melt_temperature": 212,
+                "mold_temperature": 55,
+            },
+            {
+                "material": "ABS",
+                "ambient_temperature": 24,
+            },
+            "Short shots returned on IMM-01 during cold morning production.",
+            "cold ambient affecting melt flow",
+            3500,  # 2.5 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Increased injection pressure to 95 bar per TRACE memory",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Lower ambient temperature affecting fill",
+            resolution_details="Parts filling correctly. TRACE recommendation was accurate.",
+            resolution_time_minutes=10,
+            technician_notes="TRACE recalled previous short shot fix - saved diagnostic time.",
+        ),
+    ),
+
+    # IMM-01 fifth incident - sink marks (new defect type)
+    (
+        make_incident(
+            "TRC-IMM-001-E",
+            "IMM-01",
+            "Injection_Molding",
+            "LINE-C",
+            "sink_marks",
+            [
+                "surface depressions",
+                "visible at thick sections",
+            ],
+            {
+                "injection_pressure": 95,
+                "holding_pressure": 72,
+                "cooling_time": 12,
+            },
+            {
+                "material": "ABS",
+                "ambient_temperature": 26,
+            },
+            "Sink marks visible at thick wall sections on IMM-01 parts.",
+            "insufficient holding pressure or cooling",
+            1500,  # Recent
+        ),
+        IncidentUpdate(
+            action_taken="Increased holding pressure to 85 bar and cooling time to 16s",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Insufficient holding pressure",
+            resolution_details="Sink marks eliminated. New parameters added to machine profile.",
+            resolution_time_minutes=25,
+            technician_notes="Building IMM-01 knowledge base - now covers short shot, flash, sink marks.",
+        ),
+    ),
+
+    # ============================================================
+    # INJECTION MOLDING - Other machines
+    # ============================================================
 
     (
         make_incident(
@@ -363,7 +653,8 @@ SEED_DATA = [
     ),
 
     # ============================================================
-    # WELDING - POROSITY
+    # HERO MACHINE 3: WELD-01 - Robotic Welder with rich history
+    # Shows welding defect patterns and intervention evolution
     # ============================================================
 
     (
@@ -388,7 +679,7 @@ SEED_DATA = [
             },
             "Weld inspection detected repeated surface porosity.",
             "insufficient shielding gas",
-            1400,
+            8800,  # 6 days ago - first incident
         ),
         IncidentUpdate(
             action_taken="Increased shielding gas flow to 18 L/min",
@@ -400,8 +691,151 @@ SEED_DATA = [
         ),
     ),
 
+    # WELD-01 second incident - spatter (different defect)
+    (
+        make_incident(
+            "TRC-WELD-001-B",
+            "WELD-01",
+            "Robotic_Welder",
+            "LINE-F",
+            "weld_spatter",
+            [
+                "excessive spatter",
+                "rough weld surface",
+            ],
+            {
+                "shielding_gas_flow": 18,
+                "welding_current": 210,
+                "arc_voltage": 26,
+                "wire_feed_speed": 8.5,
+            },
+            {
+                "material": "mild_steel",
+                "gas": "CO2_mix",
+            },
+            "Excessive spatter during MIG welding on WELD-01.",
+            "voltage or wire feed issue",
+            7200,  # 5 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Reduced arc voltage to 24V",
+            action_outcome=ActionOutcome.PARTIAL,
+            confirmed_root_cause=None,
+            resolution_details="Spatter reduced but still above acceptable level.",
+            resolution_time_minutes=20,
+            technician_notes="Need to also check wire feed and contact tip.",
+        ),
+    ),
+
+    # WELD-01 third incident - spatter resolved
+    (
+        make_incident(
+            "TRC-WELD-001-C",
+            "WELD-01",
+            "Robotic_Welder",
+            "LINE-F",
+            "weld_spatter",
+            [
+                "spatter continuing",
+                "contact tip wear",
+            ],
+            {
+                "shielding_gas_flow": 18,
+                "welding_current": 205,
+                "arc_voltage": 24,
+                "wire_feed_speed": 8.5,
+            },
+            {
+                "material": "mild_steel",
+                "gas": "CO2_mix",
+            },
+            "Spatter persisting on WELD-01 after voltage adjustment.",
+            "worn contact tip",
+            5800,  # 4 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Replaced contact tip and adjusted wire feed to 7.8 m/min",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Worn contact tip causing erratic arc",
+            resolution_details="Spatter eliminated. Clean weld bead achieved.",
+            resolution_time_minutes=25,
+            technician_notes="Contact tip was heavily worn. Added to weekly inspection.",
+        ),
+    ),
+
+    # WELD-01 fourth incident - arc deviation
+    (
+        make_incident(
+            "TRC-WELD-001-D",
+            "WELD-01",
+            "Robotic_Welder",
+            "LINE-F",
+            "arc_deviation",
+            [
+                "wandering arc",
+                "inconsistent penetration",
+            ],
+            {
+                "shielding_gas_flow": 18,
+                "welding_current": 200,
+                "arc_voltage": 24,
+                "magnetic_field": "detected",
+            },
+            {
+                "material": "mild_steel",
+                "gas": "CO2_mix",
+            },
+            "Arc wandering during welding, causing inconsistent penetration.",
+            "arc blow or fixture issue",
+            3200,  # 2 days ago
+        ),
+        IncidentUpdate(
+            action_taken="Repositioned ground clamp and demagnetized workpiece",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Arc blow from magnetic field",
+            resolution_details="Arc stabilized after demagnetization.",
+            resolution_time_minutes=35,
+            technician_notes="Residual magnetism in fixture was causing arc deflection.",
+        ),
+    ),
+
+    # WELD-01 fifth incident - porosity returns (TRACE should recall first fix)
+    (
+        make_incident(
+            "TRC-WELD-001-E",
+            "WELD-01",
+            "Robotic_Welder",
+            "LINE-F",
+            "weld_porosity",
+            [
+                "subsurface pores",
+                "gas bubbles",
+            ],
+            {
+                "shielding_gas_flow": 14,
+                "welding_current": 188,
+                "arc_voltage": 23,
+            },
+            {
+                "material": "stainless_steel",
+                "gas": "argon",
+            },
+            "Porosity detected in radiograph on WELD-01 stainless welds.",
+            "gas flow reduced",
+            1600,  # Recent
+        ),
+        IncidentUpdate(
+            action_taken="Increased gas flow to 18 L/min per TRACE recommendation",
+            action_outcome=ActionOutcome.SUCCESS,
+            confirmed_root_cause="Gas flow had drifted down",
+            resolution_details="Porosity eliminated. TRACE memory was accurate.",
+            resolution_time_minutes=12,
+            technician_notes="TRACE immediately recalled previous porosity fix. Fast resolution.",
+        ),
+    ),
+
     # ============================================================
-    # WELDING - POROSITY PARTIAL
+    # WELDING - Other machines
     # ============================================================
 
     (
