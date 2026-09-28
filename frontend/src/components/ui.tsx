@@ -99,7 +99,7 @@ export function Section({
 }) {
   const headingId = id ? `${id}-heading` : undefined;
   return (
-    <section id={id} aria-labelledby={headingId} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <section id={id} aria-labelledby={headingId} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 scroll-mt-16">
       <div className="flex items-center gap-2 mb-4">
         <span aria-hidden>{icon}</span>
         <h3 id={headingId} className="text-lg font-semibold text-industrial-900">

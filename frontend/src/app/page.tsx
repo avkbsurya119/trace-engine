@@ -7,9 +7,10 @@ import { ReportIncident } from "@/components/ReportIncident";
 import { IncidentAnalysis } from "@/components/IncidentAnalysis";
 import { MachineMemory } from "@/components/MachineMemory";
 import { BeforeAfterMemory } from "@/components/BeforeAfterMemory";
+import { IntelligencePage } from "@/components/intelligence/IntelligencePage";
 import type { AnalysisResult, DemoPreset } from "@/types/incident";
 
-type View = "dashboard" | "report" | "analysis" | "memory";
+type View = "dashboard" | "intelligence" | "report" | "analysis" | "memory";
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<View>("dashboard");
@@ -55,6 +56,8 @@ export default function Home() {
             onShowBeforeAfter={() => setShowBeforeAfter(true)}
           />
         );
+      case "intelligence":
+        return <IntelligencePage onViewMachineMemory={handleViewMachineMemory} />;
       case "report":
         return (
           <ReportIncident

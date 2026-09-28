@@ -13,7 +13,14 @@ const LEVEL_TITLE: Record<ConfidenceCheck["level"], string> = {
 };
 
 /** Why this action, why this confidence, why not the alternatives, and the AI wording. */
-export function WhyPanel({ recommendation }: { recommendation: Recommendation }) {
+export function WhyPanel({
+  recommendation,
+  summaryLabel,
+}: {
+  recommendation: Recommendation;
+  /** Overrides the summary box label (e.g. where the LLM is intentionally not used). */
+  summaryLabel?: string;
+}) {
   return (
     <Section icon={<Scale className="w-5 h-5 text-industrial-600" />} title="Why this recommendation" id="why">
       <ConfidenceChecklist checks={recommendation.confidence_checks} />
@@ -37,7 +44,8 @@ export function WhyPanel({ recommendation }: { recommendation: Recommendation })
       <div className="mt-5 rounded-lg border-2 border-dashed border-purple-300 bg-purple-50/60 p-4">
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-purple-700 mb-2">
           <Sparkles className="w-4 h-4" aria-hidden />
-          {recommendation.reasoning_source === "llm" ? "AI-written summary of the evidence above" : "Rule-based summary (AI unavailable)"}
+          {summaryLabel ??
+            (recommendation.reasoning_source === "llm" ? "AI-written summary of the evidence above" : "Rule-based summary (AI unavailable)")}
         </p>
         <p className="text-sm text-purple-950 italic">{recommendation.reasoning}</p>
         <p className="text-xs text-purple-700 mt-2">
