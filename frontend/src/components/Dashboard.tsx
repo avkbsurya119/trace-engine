@@ -23,11 +23,13 @@ import {
 interface DashboardProps {
   onReportIncident: () => void;
   onViewMachineMemory: (machineId: string) => void;
+  onShowBeforeAfter?: () => void;
 }
 
 export function Dashboard({
   onReportIncident,
   onViewMachineMemory,
+  onShowBeforeAfter,
 }: DashboardProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,13 +93,24 @@ export function Dashboard({
             Organizational memory for manufacturing troubleshooting
           </p>
         </div>
-        <button
-          onClick={onReportIncident}
-          className="flex items-center gap-2 px-4 py-2 bg-industrial-600 text-white rounded-lg hover:bg-industrial-700 transition-colors shadow-sm"
-        >
-          <Plus className="w-5 h-5" />
-          Report Incident
-        </button>
+        <div className="flex items-center gap-3">
+          {onShowBeforeAfter && (
+            <button
+              onClick={onShowBeforeAfter}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-industrial-300 text-industrial-700 rounded-lg hover:bg-industrial-50 transition-colors shadow-sm"
+            >
+              <Brain className="w-5 h-5" />
+              See Memory Impact
+            </button>
+          )}
+          <button
+            onClick={onReportIncident}
+            className="flex items-center gap-2 px-4 py-2 bg-industrial-600 text-white rounded-lg hover:bg-industrial-700 transition-colors shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            Report Incident
+          </button>
+        </div>
       </div>
 
       {error ? (
