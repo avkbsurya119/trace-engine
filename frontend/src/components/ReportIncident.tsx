@@ -4,39 +4,45 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { humanize } from "@/lib/utils";
 import type { IncidentCreate, AnalysisResult, Fleet } from "@/types/incident";
+import { AnalysisProgress } from "@/components/analysis/AnalysisProgress";
 import { AlertTriangle, X, Plus, Loader2 } from "lucide-react";
 
 interface ReportIncidentProps {
   onAnalysisComplete: (result: AnalysisResult) => void;
   onCancel: () => void;
+  /** Pre-filled incident (demo guide). */
+  preset?: IncidentCreate | null;
 }
+
+const EMPTY_INCIDENT: IncidentCreate = {
+  machine_id: "",
+  machine_type: "",
+  production_line: "",
+  defect_type: "",
+  symptoms: [],
+  sensor_values: {},
+  operating_conditions: {},
+  description: "",
+  suspected_root_cause: "",
+  operating_hours: undefined,
+  technician_id: "",
+};
 
 const NEW_PROBLEM = "__new__";
 
 export function ReportIncident({
   onAnalysisComplete,
   onCancel,
+  preset,
 }: ReportIncidentProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<IncidentCreate>({
-    machine_id: "",
-    machine_type: "",
-    production_line: "",
-    defect_type: "",
-    symptoms: [],
-    sensor_values: {},
-    operating_conditions: {},
-    description: "",
-    suspected_root_cause: "",
-    operating_hours: undefined,
-    technician_id: "",
-  });
+  const [formData, setFormData] = useState<IncidentCreate>({ ...EMPTY_INCIDENT, ...(preset ?? {}) });
 
   const [customSymptom, setCustomSymptom] = useState("");
   const [fleet, setFleet] = useState<Fleet | null>(null);
-  const [defectChoice, setDefectChoice] = useState("");
+  const [defectChoice, setDefectChoice] = useState(preset?.defect_type ?? "");
   const [newDefect, setNewDefect] = useState("");
 
   useEffect(() => {
@@ -54,6 +60,15 @@ export function ReportIncident({
     () => machineType?.defect_types.find((d) => d.defect_type === defectChoice)?.symptoms ?? [],
     [machineType, defectChoice]
   );
+
+  const loadPreset = (key: string) => {
+    const found = fleet?.demo_presets.find((p) => p.key === key);
+    if (!found) return;
+    setFormData({ ...EMPTY_INCIDENT, ...found.incident });
+    setDefectChoice(found.incident.defect_type);
+    setNewDefect("");
+    setError(null);
+  };
 
   const selectMachineType = (value: string) => {
     setFormData((prev) => ({ ...prev, machine_type: value, machine_id: "", production_line: "", defect_type: "", symptoms: [] }));
@@ -122,18 +137,44 @@ export function ReportIncident({
             </h2>
           </div>
           <button
+            type="button"
             onClick={onCancel}
+            aria-label="Close report form"
             className="p-2 text-gray-400 hover:text-gray-600"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden />
           </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+            <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
               {error}
+            </div>
+          )}
+
+          {fleet && fleet.demo_presets.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-industrial-50 border border-industrial-100 px-3 py-2">
+              <label htmlFor="demo-preset" className="text-sm text-industrial-800 font-medium">
+                Load a demo incident
+              </label>
+              <select
+                id="demo-preset"
+                defaultValue=""
+                onChange={(e) => {
+                  loadPreset(e.target.value);
+                  e.target.value = "";
+                }}
+                className="flex-1 min-w-[14rem] px-2 py-1.5 border border-industrial-200 rounded-md text-sm bg-white"
+              >
+                <option value="">Choose…</option>
+                {fleet.demo_presets.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -318,6 +359,8 @@ export function ReportIncident({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500 focus:border-industrial-500"
             />
           </div>
+
+          {loading && <AnalysisProgress machineId={formData.machine_id} machineType={formData.machine_type} />}
 
           {/* Submit */}
           <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
