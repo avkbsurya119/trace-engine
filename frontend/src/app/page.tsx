@@ -15,7 +15,7 @@ import type { AnalysisResult, DemoPreset } from "@/types/incident";
 const JUDGE_KEY = "trace.judgeMode";
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<View>("dashboard");
+  const [currentView, setCurrentView] = useState<View>("landing");
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [selectedMachineId, setSelectedMachineId] = useState<string>("");
   const [showBeforeAfter, setShowBeforeAfter] = useState(false);
