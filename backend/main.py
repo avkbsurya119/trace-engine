@@ -4,12 +4,18 @@ TRACE — Troubleshooting & Root-Cause Adaptive Context Engine
 Main FastAPI application entry point.
 """
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api import incidents_router, dashboard_router
+from app.core.errors import MemoryUnavailableError
 from app.db.database import init_db, close_db
+
+logger = logging.getLogger("trace")
 # Create FastAPI application
 app = FastAPI(
     title="TRACE API",
@@ -28,6 +34,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(MemoryUnavailableError)
+async def memory_unavailable(request: Request, exc: MemoryUnavailableError):
+    logger.error("Hindsight unavailable on %s: %s", request.url.path, exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": f"Memory service unavailable, nothing was saved. {exc}"},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s", request.url.path)
+    return JSONResponse(status_code=500, content={"detail": f"Internal error: {exc}"})
+
 
 # Include routers
 app.include_router(incidents_router, prefix="/api")
