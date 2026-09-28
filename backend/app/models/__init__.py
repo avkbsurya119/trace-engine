@@ -8,6 +8,8 @@ from .incident import (
     AnalysisResult,
     Recommendation,
     EvidenceSummary,
+    PatternAlert,
+    CrossMachineEvidence,
 )
 
 __all__ = [
@@ -20,4 +22,6 @@ __all__ = [
     "AnalysisResult",
     "Recommendation",
     "EvidenceSummary",
+    "PatternAlert",
+    "CrossMachineEvidence",
 ]

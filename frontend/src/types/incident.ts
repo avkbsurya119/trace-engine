@@ -56,6 +56,10 @@ export interface HistoricalIncident {
   similarity_score: number;
   relevance_factors: string[];
   recalled_facts: string[];
+  // Recency data
+  recency_score?: number;
+  recency_label?: "high" | "medium" | "low";
+  days_ago?: number;
 }
 
 export interface Intervention {
@@ -69,6 +73,32 @@ export interface Intervention {
   date: string;
   similarity: number;
   relevance: string[];
+  // Recency data
+  recency_score?: number;
+  recency_label?: "high" | "medium" | "low";
+  days_ago?: number;
+}
+
+export interface PatternAlert {
+  defect_type: string;
+  total_occurrences: number;
+  first_occurrence: string;
+  most_recent: string;
+  successful_resolutions: number;
+  failed_resolutions: number;
+  partial_resolutions: number;
+  machines_affected: string[];
+  is_recurring: boolean;
+}
+
+export interface CrossMachineEvidence {
+  intervention_category: string;
+  example_action: string;
+  machines_succeeded: string[];
+  machines_failed: string[];
+  success_count: number;
+  total_count: number;
+  cross_machine_confidence: "strong" | "moderate" | "weak" | "none";
 }
 
 export interface EvidenceSummary {
@@ -118,6 +148,9 @@ export interface AnalysisResult {
   recommendation: Recommendation;
   memory_contribution: string;
   memory_trace: MemoryTrace;
+  // New features
+  pattern_alert?: PatternAlert;
+  cross_machine_evidence?: CrossMachineEvidence[];
 }
 
 export interface DashboardStats {

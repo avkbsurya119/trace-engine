@@ -9,6 +9,8 @@ import type {
   ActionOutcome,
   HistoricalIncident,
   EvidenceSummary,
+  PatternAlert,
+  CrossMachineEvidence,
 } from "@/types/incident";
 import {
   ArrowLeft,
@@ -30,6 +32,9 @@ import {
   Brain,
   Target,
   Zap,
+  RefreshCw,
+  Layers,
+  Clock,
 } from "lucide-react";
 
 interface Props {
@@ -141,6 +146,16 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
       {/* Pipeline panel + memory moment */}
       <PipelineDebug result={result} />
       <MemoryMoment result={result} />
+
+      {/* Pattern Alert - "We've seen this before" */}
+      {result.pattern_alert && result.pattern_alert.total_occurrences >= 2 && (
+        <PatternAlertBanner alert={result.pattern_alert} />
+      )}
+
+      {/* Cross-Machine Evidence */}
+      {result.cross_machine_evidence && result.cross_machine_evidence.length > 0 && (
+        <CrossMachineEvidenceBanner evidence={result.cross_machine_evidence} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* ---------------- Left: what happened, recommendation, outcome ---------------- */}
@@ -551,8 +566,20 @@ function HistoryCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const { incident, similarity_score, recalled_facts } = historical;
+  const { incident, similarity_score, recalled_facts, recency_label, days_ago } = historical;
   const sameMachine = incident.machine_id === currentMachine;
+
+  const recencyStyles = {
+    high: "bg-green-100 text-green-700",
+    medium: "bg-amber-100 text-amber-700",
+    low: "bg-gray-100 text-gray-600",
+  };
+
+  const recencyText = {
+    high: "Recent",
+    medium: "Older",
+    low: "Historical",
+  };
 
   return (
     <div className={cn("border rounded-lg overflow-hidden", sameMachine ? "border-industrial-300" : "border-gray-200")}>
@@ -566,6 +593,16 @@ function HistoryCard({
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Recency badge */}
+            {recency_label && (
+              <span
+                className={cn("text-xs px-1.5 py-0.5 rounded flex items-center gap-1", recencyStyles[recency_label])}
+                title={`${days_ago} days ago`}
+              >
+                <Clock className="w-3 h-3" />
+                {recencyText[recency_label]}
+              </span>
+            )}
             <span className="text-xs text-gray-500" title="Hindsight semantic similarity">
               {Math.round(similarity_score * 100)}% match
             </span>
@@ -711,6 +748,173 @@ function PipelineStep({ label, status, value }: { label: string; status?: "succe
       {!status && <span className="text-gray-500">·</span>}
       <span className="text-gray-400">{label}</span>
       {value && <span className="text-white ml-auto truncate max-w-[50%]" title={value}>{value}</span>}
+    </div>
+  );
+}
+
+// ============================================================
+// Pattern Alert - "We've Seen This Before"
+// ============================================================
+
+function PatternAlertBanner({ alert }: { alert: PatternAlert }) {
+  const isRecurring = alert.total_occurrences >= 3;
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl p-5 border-2",
+        isRecurring
+          ? "bg-gradient-to-r from-red-50 to-orange-50 border-red-300"
+          : "bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-300"
+      )}
+    >
+      <div className="flex items-start gap-4">
+        <div className={cn("p-3 rounded-full", isRecurring ? "bg-red-100" : "bg-amber-100")}>
+          <RefreshCw className={cn("w-6 h-6", isRecurring ? "text-red-600" : "text-amber-600")} />
+        </div>
+        <div className="flex-1">
+          <h3 className={cn("text-lg font-bold", isRecurring ? "text-red-800" : "text-amber-800")}>
+            {isRecurring ? "🚨 " : ""}TRACE Has Seen This Pattern {alert.total_occurrences} Times Before
+          </h3>
+          <p className={cn("text-sm mt-1", isRecurring ? "text-red-700" : "text-amber-700")}>
+            {humanize(alert.defect_type)} is a {isRecurring ? "recurring" : "known"} issue
+            {alert.machines_affected.length > 1 && ` across ${alert.machines_affected.length} machines`}.
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+            <div className="bg-white/60 rounded-lg p-3">
+              <p className="text-xs text-gray-500">First occurrence</p>
+              <p className="font-semibold text-gray-900">{alert.first_occurrence}</p>
+            </div>
+            <div className="bg-white/60 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Most recent</p>
+              <p className="font-semibold text-gray-900">{alert.most_recent}</p>
+            </div>
+            <div className="bg-white/60 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Total occurrences</p>
+              <p className="font-semibold text-gray-900">{alert.total_occurrences}</p>
+            </div>
+            <div className="bg-white/60 rounded-lg p-3">
+              <p className="text-xs text-gray-500">Resolution rate</p>
+              <p className="font-semibold text-gray-900">
+                <span className="text-green-600">{alert.successful_resolutions}</span>
+                {" / "}
+                <span className="text-red-600">{alert.failed_resolutions}</span>
+                {" / "}
+                <span className="text-amber-600">{alert.partial_resolutions}</span>
+              </p>
+              <p className="text-xs text-gray-400">success / fail / partial</p>
+            </div>
+          </div>
+
+          {alert.machines_affected.length > 1 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className="text-xs text-gray-500">Machines affected:</span>
+              {alert.machines_affected.slice(0, 5).map((m) => (
+                <span key={m} className="px-2 py-0.5 bg-white/80 rounded text-xs text-gray-700">
+                  {m}
+                </span>
+              ))}
+              {alert.machines_affected.length > 5 && (
+                <span className="px-2 py-0.5 bg-white/80 rounded text-xs text-gray-500">
+                  +{alert.machines_affected.length - 5} more
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Cross-Machine Evidence
+// ============================================================
+
+function CrossMachineEvidenceBanner({ evidence }: { evidence: CrossMachineEvidence[] }) {
+  // Only show if there's at least one intervention with 2+ machine successes
+  const significant = evidence.filter((e) => e.success_count >= 2);
+  if (significant.length === 0) return null;
+
+  return (
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+      <div className="flex items-start gap-4">
+        <div className="p-3 bg-blue-100 rounded-full">
+          <Layers className="w-6 h-6 text-blue-600" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-lg font-bold text-blue-800">Cross-Machine Evidence Found</h3>
+          <p className="text-sm text-blue-700 mt-1">
+            These interventions have succeeded on multiple machines of the same type.
+          </p>
+
+          <div className="mt-4 space-y-3">
+            {significant.slice(0, 3).map((item) => (
+              <div
+                key={item.intervention_category}
+                className={cn(
+                  "bg-white/70 rounded-lg p-4 border",
+                  item.cross_machine_confidence === "strong"
+                    ? "border-green-300"
+                    : item.cross_machine_confidence === "moderate"
+                    ? "border-blue-300"
+                    : "border-gray-200"
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">{item.intervention_category}</p>
+                    <p className="text-sm text-gray-600 mt-0.5">{item.example_action}</p>
+                  </div>
+                  <span
+                    className={cn(
+                      "px-2 py-1 rounded-full text-xs font-medium",
+                      item.cross_machine_confidence === "strong"
+                        ? "bg-green-100 text-green-800"
+                        : item.cross_machine_confidence === "moderate"
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-gray-100 text-gray-700"
+                    )}
+                  >
+                    {item.cross_machine_confidence} evidence
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span className="text-green-700">
+                      Succeeded on {item.success_count} machine{item.success_count !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  {item.machines_failed.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <XCircle className="w-4 h-4 text-red-500" />
+                      <span className="text-red-700">
+                        Failed on {item.machines_failed.length}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {item.machines_succeeded.slice(0, 4).map((m) => (
+                    <span key={m} className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs">
+                      ✓ {m}
+                    </span>
+                  ))}
+                  {item.machines_succeeded.length > 4 && (
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">
+                      +{item.machines_succeeded.length - 4} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
