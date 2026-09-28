@@ -1,42 +1,32 @@
 """
-Hindsight API Client
+Hindsight SDK Client
 
-This module provides the interface for connecting to the Hindsight
-persistent memory service.
+TRACE's interface to the Hindsight persistent memory service.
 """
 
-import httpx
 from typing import Dict, Any, List, Optional
+
+from hindsight_client import Hindsight
+
 from app.core.config import settings
 
 
 class HindsightClient:
-    """Client for interacting with the Hindsight memory API."""
+    """Client for interacting with Hindsight using the official Python SDK."""
 
     def __init__(self):
         self.base_url = settings.hindsight_api_url
         self.api_key = settings.hindsight_api_key
         self.namespace = settings.hindsight_namespace
-        self._client: Optional[httpx.AsyncClient] = None
 
-    async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create HTTP client."""
-        if self._client is None:
-            self._client = httpx.AsyncClient(
-                base_url=self.base_url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                timeout=30.0,
-            )
-        return self._client
+        self._client = Hindsight(
+            base_url=self.base_url,
+            api_key=self.api_key,
+        )
 
     async def close(self):
-        """Close the HTTP client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        """Close the Hindsight SDK client."""
+        await self._client.aclose()
 
     async def store_memory(
         self,
@@ -45,28 +35,20 @@ class HindsightClient:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Store a memory in Hindsight.
+        Store a TRACE incident in Hindsight.
 
-        Args:
-            memory_id: Unique identifier for this memory
-            content: The memory content to store
-            metadata: Optional metadata for filtering/retrieval
-
-        Returns:
-            Response from Hindsight API
+        The incident ID is preserved as Hindsight's document_id so that
+        the memory can be traced back to the structured SQLite record.
         """
-        client = await self._get_client()
 
-        payload = {
-            "namespace": self.namespace,
-            "memory_id": memory_id,
-            "content": content,
-            "metadata": metadata or {},
-        }
+        result = await self._client.aretain(
+            bank_id=self.namespace,
+            content=self._content_to_text(content),
+            document_id=memory_id,
+            metadata=self._stringify_metadata(metadata),
+        )
 
-        response = await client.post("/memories", json=payload)
-        response.raise_for_status()
-        return response.json()
+        return self._response_to_dict(result)
 
     async def search_memories(
         self,
@@ -75,51 +57,47 @@ class HindsightClient:
         limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """
-        Search for relevant memories in Hindsight.
-
-        Args:
-            query: Search query (natural language or structured)
-            filters: Optional filters (machine_id, defect_type, etc.)
-            limit: Maximum number of results
-
-        Returns:
-            List of relevant memories with similarity scores
+        Recall relevant historical incidents from Hindsight.
         """
-        client = await self._get_client()
 
-        payload = {
-            "namespace": self.namespace,
-            "query": query,
-            "filters": filters or {},
-            "limit": limit,
-        }
+        recall_query = query
 
-        response = await client.post("/memories/search", json=payload)
-        response.raise_for_status()
-        return response.json().get("memories", [])
+        if filters:
+            filter_text = ", ".join(
+                f"{key}={value}"
+                for key, value in filters.items()
+                if value is not None
+            )
 
-    async def get_memory(self, memory_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve a specific memory by ID.
+            if filter_text:
+                recall_query = f"{query}. Relevant constraints: {filter_text}"
 
-        Args:
-            memory_id: The memory identifier
-
-        Returns:
-            Memory content or None if not found
-        """
-        client = await self._get_client()
-
-        response = await client.get(
-            f"/memories/{memory_id}",
-            params={"namespace": self.namespace},
+        result = await self._client.arecall(
+            bank_id=self.namespace,
+            query=recall_query,
+            max_tokens=max(512, limit * 256),
         )
 
-        if response.status_code == 404:
-            return None
+        return self._extract_results(result, limit)
 
-        response.raise_for_status()
-        return response.json()
+    async def get_memory(
+        self,
+        memory_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve a specific memory.
+
+        Hindsight recall is semantic rather than a direct document lookup,
+        so this method searches for the supplied document/incident ID.
+        """
+
+        results = await self.search_memories(
+            query=f"incident {memory_id}",
+            filters={"incident_id": memory_id},
+            limit=1,
+        )
+
+        return results[0] if results else None
 
     async def update_memory(
         self,
@@ -128,46 +106,27 @@ class HindsightClient:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Update an existing memory.
-
-        Args:
-            memory_id: The memory identifier
-            content: Updated content
-            metadata: Updated metadata
-
-        Returns:
-            Updated memory
+        Update an existing memory by retaining the updated incident content.
         """
-        client = await self._get_client()
 
-        payload = {
-            "namespace": self.namespace,
-            "content": content,
-            "metadata": metadata or {},
-        }
+        result = await self._client.aretain(
+            bank_id=self.namespace,
+            content=self._content_to_text(content),
+            document_id=memory_id,
+            metadata=self._stringify_metadata(metadata),
+            update_mode="replace",
+        )
 
-        response = await client.put(f"/memories/{memory_id}", json=payload)
-        response.raise_for_status()
-        return response.json()
+        return self._response_to_dict(result)
 
     async def delete_memory(self, memory_id: str) -> bool:
         """
-        Delete a memory.
+        Hindsight document deletion is not part of the client interface
+        currently used by TRACE.
 
-        Args:
-            memory_id: The memory identifier
-
-        Returns:
-            True if deleted successfully
+        Keep this compatibility method without issuing an unsafe request.
         """
-        client = await self._get_client()
-
-        response = await client.delete(
-            f"/memories/{memory_id}",
-            params={"namespace": self.namespace},
-        )
-
-        return response.status_code == 204
+        return False
 
     async def list_memories(
         self,
@@ -176,27 +135,104 @@ class HindsightClient:
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
         """
-        List memories with optional filtering.
+        Hindsight is recall-oriented rather than a traditional CRUD store.
 
-        Args:
-            filters: Optional filters
-            limit: Maximum results
-            offset: Pagination offset
-
-        Returns:
-            List of memories
+        Use a broad semantic recall query when callers request a list.
         """
-        client = await self._get_client()
 
-        params = {
-            "namespace": self.namespace,
-            "limit": limit,
-            "offset": offset,
-        }
+        query = "historical manufacturing machine incidents"
 
         if filters:
-            params["filters"] = filters
+            filter_text = ", ".join(
+                f"{key}={value}"
+                for key, value in filters.items()
+                if value is not None
+            )
 
-        response = await client.get("/memories", params=params)
-        response.raise_for_status()
-        return response.json().get("memories", [])
+            if filter_text:
+                query += f" matching {filter_text}"
+
+        results = await self.search_memories(
+            query=query,
+            limit=limit + offset,
+        )
+
+        return results[offset:offset + limit]
+
+    @staticmethod
+    def _content_to_text(content: Dict[str, Any]) -> str:
+        """
+        Convert structured incident data into natural language.
+
+        Hindsight's retain operation is designed to process natural-language
+        memory content.
+        """
+
+        parts = []
+
+        for key, value in content.items():
+            if value is None:
+                continue
+
+            label = key.replace("_", " ").strip().title()
+            parts.append(f"{label}: {value}")
+
+        return "\n".join(parts)
+
+    @staticmethod
+    def _stringify_metadata(
+        metadata: Optional[Dict[str, Any]],
+    ) -> Dict[str, str]:
+        """Convert metadata values to strings as required by the SDK."""
+
+        if not metadata:
+            return {}
+
+        return {
+            str(key): str(value)
+            for key, value in metadata.items()
+            if value is not None
+        }
+
+    @staticmethod
+    def _response_to_dict(result: Any) -> Dict[str, Any]:
+        """Convert an SDK response model into a JSON-compatible dictionary."""
+
+        if hasattr(result, "model_dump"):
+            return result.model_dump()
+
+        if hasattr(result, "dict"):
+            return result.dict()
+
+        if isinstance(result, dict):
+            return result
+
+        return {"result": str(result)}
+
+    @staticmethod
+    def _extract_results(
+        result: Any,
+        limit: int,
+    ) -> List[Dict[str, Any]]:
+        """Extract recall results from the SDK response."""
+
+        if hasattr(result, "results"):
+            raw_results = result.results
+        elif isinstance(result, dict):
+            raw_results = result.get("results", [])
+        else:
+            raw_results = []
+
+        extracted = []
+
+        for item in raw_results[:limit]:
+            if hasattr(item, "model_dump"):
+                extracted.append(item.model_dump())
+            elif hasattr(item, "dict"):
+                extracted.append(item.dict())
+            elif isinstance(item, dict):
+                extracted.append(item)
+            else:
+                extracted.append({"result": str(item)})
+
+        return extracted

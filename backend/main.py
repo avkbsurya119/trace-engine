@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api import incidents_router, dashboard_router
-
+from app.db.database import init_db, close_db
 # Create FastAPI application
 app = FastAPI(
     title="TRACE API",
@@ -43,7 +43,14 @@ async def root():
         "description": "Manufacturing defect resolution agent with persistent memory",
         "docs": "/docs",
     }
+@app.on_event("startup")
+async def startup():
+    await init_db()
 
+
+@app.on_event("shutdown")
+async def shutdown():
+    await close_db()
 
 if __name__ == "__main__":
     import uvicorn

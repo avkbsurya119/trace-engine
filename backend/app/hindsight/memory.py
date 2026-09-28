@@ -1,13 +1,18 @@
 """
 Memory Service
 
-High-level service for managing manufacturing incident memories
-using Hindsight as the persistence layer.
+High-level service for managing manufacturing incident memories.
+
+Architecture:
+    SQLite   -> exact structured source of truth
+    Hindsight -> semantic memory and similarity retrieval
+
+TRACE uses Hindsight to remember and retrieve relevant historical
+incidents, but always gets the complete authoritative incident record
+from SQLite.
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime
-import json
 
 from app.models import (
     Incident,
@@ -16,21 +21,32 @@ from app.models import (
     HistoricalIncident,
     ActionOutcome,
 )
+
+from app.db.repository import IncidentRepository
+
 from .client import HindsightClient
 
 
 class MemoryService:
-    """Service for storing and retrieving incident memories."""
+    """Service for storing and retrieving manufacturing incident memories."""
 
     def __init__(self):
         self.client = HindsightClient()
+        self.repository = IncidentRepository()
 
     async def close(self):
-        """Close the underlying client."""
+        """Close the underlying Hindsight client."""
         await self.client.close()
 
+    # ------------------------------------------------------------------
+    # Incident conversion helpers
+    # ------------------------------------------------------------------
+
     def _incident_to_memory(self, incident: Incident) -> Dict[str, Any]:
-        """Convert an Incident to memory format for Hindsight."""
+        """
+        Convert an Incident into structured content for Hindsight.
+        """
+
         return {
             "type": "manufacturing_incident",
             "incident_id": incident.incident_id,
@@ -46,16 +62,22 @@ class MemoryService:
             "suspected_root_cause": incident.suspected_root_cause,
             "confirmed_root_cause": incident.confirmed_root_cause,
             "action_taken": incident.action_taken,
-            "action_outcome": incident.action_outcome.value if incident.action_outcome else None,
+            "action_outcome": (
+                incident.action_outcome.value
+                if incident.action_outcome
+                else None
+            ),
             "resolution_details": incident.resolution_details,
             "resolution_time_minutes": incident.resolution_time_minutes,
             "technician_notes": incident.technician_notes,
-            # Searchable text for semantic retrieval
             "searchable_text": self._build_searchable_text(incident),
         }
 
     def _build_searchable_text(self, incident: Incident) -> str:
-        """Build a searchable text representation of the incident."""
+        """
+        Build natural-language text for semantic retrieval.
+        """
+
         parts = [
             f"Machine: {incident.machine_id} ({incident.machine_type})",
             f"Line: {incident.production_line}",
@@ -64,70 +86,84 @@ class MemoryService:
             f"Description: {incident.description}",
         ]
 
+        if incident.sensor_values:
+            parts.append(
+                f"Sensor values: {incident.sensor_values}"
+            )
+
+        if incident.operating_conditions:
+            parts.append(
+                f"Operating conditions: {incident.operating_conditions}"
+            )
+
         if incident.suspected_root_cause:
-            parts.append(f"Suspected cause: {incident.suspected_root_cause}")
+            parts.append(
+                f"Suspected cause: {incident.suspected_root_cause}"
+            )
 
         if incident.confirmed_root_cause:
-            parts.append(f"Confirmed cause: {incident.confirmed_root_cause}")
+            parts.append(
+                f"Confirmed cause: {incident.confirmed_root_cause}"
+            )
 
         if incident.action_taken:
-            parts.append(f"Action: {incident.action_taken}")
+            parts.append(
+                f"Action: {incident.action_taken}"
+            )
 
         if incident.action_outcome:
-            parts.append(f"Outcome: {incident.action_outcome.value}")
+            parts.append(
+                f"Outcome: {incident.action_outcome.value}"
+            )
 
         if incident.resolution_details:
-            parts.append(f"Resolution: {incident.resolution_details}")
+            parts.append(
+                f"Resolution: {incident.resolution_details}"
+            )
+
+        if incident.technician_notes:
+            parts.append(
+                f"Technician notes: {incident.technician_notes}"
+            )
 
         return " | ".join(parts)
 
-    def _memory_to_incident(self, memory: Dict[str, Any]) -> Incident:
-        """Convert memory data back to an Incident."""
-        content = memory.get("content", memory)
-
-        return Incident(
-            incident_id=content["incident_id"],
-            machine_id=content["machine_id"],
-            machine_type=content["machine_type"],
-            production_line=content["production_line"],
-            timestamp=datetime.fromisoformat(content["timestamp"]),
-            defect_type=content["defect_type"],
-            symptoms=content.get("symptoms", []),
-            sensor_values=content.get("sensor_values"),
-            operating_conditions=content.get("operating_conditions"),
-            description=content["description"],
-            suspected_root_cause=content.get("suspected_root_cause"),
-            confirmed_root_cause=content.get("confirmed_root_cause"),
-            action_taken=content.get("action_taken"),
-            action_outcome=(
-                ActionOutcome(content["action_outcome"])
-                if content.get("action_outcome")
-                else None
-            ),
-            resolution_details=content.get("resolution_details"),
-            resolution_time_minutes=content.get("resolution_time_minutes"),
-            technician_notes=content.get("technician_notes"),
-        )
+    # ------------------------------------------------------------------
+    # Store
+    # ------------------------------------------------------------------
 
     async def store_incident(self, incident: Incident) -> str:
         """
-        Store an incident in Hindsight memory.
+        Store an incident in both SQLite and Hindsight.
 
-        Args:
-            incident: The incident to store
-
-        Returns:
-            The incident_id
+        SQLite is the authoritative structured store.
+        Hindsight provides semantic memory.
         """
+
+        # --------------------------------------------------------------
+        # 1. Store exact incident in SQLite
+        # --------------------------------------------------------------
+        await self.repository.create(incident)
+
+        # --------------------------------------------------------------
+        # 2. Store semantic representation in Hindsight
+        # --------------------------------------------------------------
         content = self._incident_to_memory(incident)
 
         metadata = {
+            "incident_id": incident.incident_id,
             "machine_id": incident.machine_id,
             "machine_type": incident.machine_type,
             "production_line": incident.production_line,
             "defect_type": incident.defect_type,
-            "has_outcome": incident.action_outcome is not None,
-            "outcome": incident.action_outcome.value if incident.action_outcome else None,
+            "has_outcome": (
+                incident.action_outcome is not None
+            ),
+            "outcome": (
+                incident.action_outcome.value
+                if incident.action_outcome
+                else None
+            ),
         }
 
         await self.client.store_memory(
@@ -138,76 +174,232 @@ class MemoryService:
 
         return incident.incident_id
 
+    # ------------------------------------------------------------------
+    # Semantic search
+    # ------------------------------------------------------------------
+
     async def search_similar_incidents(
         self,
         incident: IncidentCreate,
         limit: int = 10,
     ) -> List[HistoricalIncident]:
         """
-        Search for historical incidents similar to the given incident.
+        Search Hindsight for semantically similar incidents.
 
-        Args:
-            incident: The current incident to find matches for
-            limit: Maximum number of results
+        Hindsight identifies candidate memories.
 
-        Returns:
-            List of similar historical incidents with relevance scores
+        SQLite then provides the exact incident records.
+
+        Only incidents with recorded outcomes are returned because
+        TRACE needs historical evidence about what happened after
+        an intervention.
         """
-        # Build search query from incident details
+
+        # --------------------------------------------------------------
+        # Build semantic query
+        # --------------------------------------------------------------
+
         query_parts = [
             f"Machine type: {incident.machine_type}",
             f"Defect: {incident.defect_type}",
             f"Symptoms: {', '.join(incident.symptoms)}",
-            incident.description,
+            f"Description: {incident.description}",
         ]
 
         if incident.suspected_root_cause:
-            query_parts.append(f"Suspected cause: {incident.suspected_root_cause}")
+            query_parts.append(
+                f"Suspected cause: {incident.suspected_root_cause}"
+            )
+
+        if incident.sensor_values:
+            query_parts.append(
+                f"Sensor values: {incident.sensor_values}"
+            )
+
+        if incident.operating_conditions:
+            query_parts.append(
+                f"Operating conditions: {incident.operating_conditions}"
+            )
 
         query = " ".join(query_parts)
 
-        # Add filters for better matching
-        filters = {
-            "machine_type": incident.machine_type,
-            "has_outcome": True,  # Only retrieve incidents with recorded outcomes
-        }
+        # Ask for more candidates than the final limit because:
+        # - Hindsight may return observations and world memories
+        # - multiple memories can refer to the same incident
+        # - some candidates may not have an outcome
+        candidate_limit = max(limit * 4, 20)
 
-        # Search Hindsight
         memories = await self.client.search_memories(
             query=query,
-            filters=filters,
-            limit=limit,
+            limit=candidate_limit,
         )
 
-        # Convert to HistoricalIncident objects
-        results = []
+        # --------------------------------------------------------------
+        # Extract unique incident IDs from Hindsight
+        # --------------------------------------------------------------
+
+        candidate_ids: List[str] = []
+        candidate_scores: Dict[str, float] = {}
+
         for memory in memories:
-            try:
-                hist_incident = self._memory_to_incident(memory)
-                similarity = memory.get("similarity_score", memory.get("score", 0.5))
+            incident_id = self._extract_incident_id(memory)
 
-                # Determine relevance factors
-                relevance_factors = self._compute_relevance_factors(incident, hist_incident)
-
-                results.append(
-                    HistoricalIncident(
-                        incident=hist_incident,
-                        similarity_score=similarity,
-                        relevance_factors=relevance_factors,
-                    )
-                )
-            except Exception:
-                # Skip malformed memories
+            if not incident_id:
                 continue
 
-        return results
+            # Avoid duplicate incidents caused by multiple Hindsight
+            # memory types such as observation + world.
+            if incident_id not in candidate_ids:
+                candidate_ids.append(incident_id)
+
+            score = self._extract_score(memory)
+
+            # Keep the strongest score seen for this incident.
+            previous_score = candidate_scores.get(incident_id, 0.0)
+
+            if score > previous_score:
+                candidate_scores[incident_id] = score
+
+        # --------------------------------------------------------------
+        # Fetch exact records from SQLite
+        # --------------------------------------------------------------
+
+        results: List[HistoricalIncident] = []
+
+        for incident_id in candidate_ids:
+            if len(results) >= limit:
+                break
+
+            historical = await self.repository.get(incident_id)
+
+            if historical is None:
+                continue
+
+            # Only historical incidents with an actual recorded
+            # troubleshooting outcome are useful evidence.
+            if historical.action_outcome is None:
+                continue
+
+            similarity = candidate_scores.get(
+                incident_id,
+                0.0,
+            )
+
+            relevance_factors = self._compute_relevance_factors(
+                incident,
+                historical,
+            )
+
+            results.append(
+                HistoricalIncident(
+                    incident=historical,
+                    similarity_score=similarity,
+                    relevance_factors=relevance_factors,
+                )
+            )
+
+        # Highest semantic similarity first.
+        results.sort(
+            key=lambda item: item.similarity_score,
+            reverse=True,
+        )
+
+        return results[:limit]
+
+    # ------------------------------------------------------------------
+    # Hindsight result helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_incident_id(
+        memory: Dict[str, Any],
+    ) -> Optional[str]:
+        """
+        Extract the TRACE incident ID from a Hindsight RecallResult.
+
+        Hindsight can expose the ID through:
+        1. document_id
+        2. metadata.incident_id
+        3. incident_id tag
+        """
+
+        document_id = memory.get("document_id")
+
+        if document_id:
+            return str(document_id)
+
+        metadata = memory.get("metadata") or {}
+
+        incident_id = metadata.get("incident_id")
+
+        if incident_id:
+            return str(incident_id)
+
+        tags = memory.get("tags") or []
+
+        for tag in tags:
+            if isinstance(tag, str) and tag.startswith(
+                "incident_id:"
+            ):
+                return tag.split(":", 1)[1]
+
+        return None
+
+    @staticmethod
+    def _extract_score(
+        memory: Dict[str, Any],
+    ) -> float:
+        """
+        Extract a usable 0-1 similarity score from Hindsight.
+
+        Hindsight's final ranking score is not necessarily a
+        probability, so semantic score is preferred when available.
+        """
+
+        scores = memory.get("scores") or {}
+
+        if isinstance(scores, dict):
+            value = scores.get("semantic")
+
+            if value is None:
+                value = scores.get("final")
+
+            if value is not None:
+                try:
+                    value = float(value)
+                    return max(0.0, min(1.0, value))
+                except (TypeError, ValueError):
+                    pass
+
+        # Compatibility with older response formats.
+        for key in (
+            "similarity_score",
+            "score",
+        ):
+            value = memory.get(key)
+
+            if value is not None:
+                try:
+                    value = float(value)
+                    return max(0.0, min(1.0, value))
+                except (TypeError, ValueError):
+                    pass
+
+        return 0.0
+
+    # ------------------------------------------------------------------
+    # Relevance
+    # ------------------------------------------------------------------
 
     def _compute_relevance_factors(
         self,
         current: IncidentCreate,
         historical: Incident,
     ) -> List[str]:
-        """Compute why a historical incident is relevant."""
+        """
+        Explain why a historical incident is relevant.
+        """
+
         factors = []
 
         if current.machine_id == historical.machine_id:
@@ -222,22 +414,45 @@ class MemoryService:
         if current.defect_type == historical.defect_type:
             factors.append("Same defect type")
 
-        # Check symptom overlap
-        current_symptoms = set(s.lower() for s in current.symptoms)
-        hist_symptoms = set(s.lower() for s in historical.symptoms)
-        overlap = current_symptoms & hist_symptoms
+        current_symptoms = set(
+            symptom.lower()
+            for symptom in current.symptoms
+        )
+
+        historical_symptoms = set(
+            symptom.lower()
+            for symptom in historical.symptoms
+        )
+
+        overlap = current_symptoms & historical_symptoms
 
         if overlap:
-            factors.append(f"Shared symptoms: {', '.join(overlap)}")
+            factors.append(
+                "Shared symptoms: "
+                + ", ".join(sorted(overlap))
+            )
 
         return factors
 
-    async def get_incident(self, incident_id: str) -> Optional[Incident]:
-        """Retrieve a specific incident by ID."""
-        memory = await self.client.get_memory(incident_id)
-        if memory:
-            return self._memory_to_incident(memory)
-        return None
+    # ------------------------------------------------------------------
+    # Exact incident lookup
+    # ------------------------------------------------------------------
+
+    async def get_incident(
+        self,
+        incident_id: str,
+    ) -> Optional[Incident]:
+        """
+        Retrieve an exact incident from SQLite.
+
+        SQLite is the source of truth.
+        """
+
+        return await self.repository.get(incident_id)
+
+    # ------------------------------------------------------------------
+    # Update outcome
+    # ------------------------------------------------------------------
 
     async def update_incident_outcome(
         self,
@@ -245,36 +460,77 @@ class MemoryService:
         update: IncidentUpdate,
     ) -> Optional[Incident]:
         """
-        Update an incident with its outcome.
+        Record the outcome of a troubleshooting intervention.
 
-        Args:
-            incident_id: The incident to update
-            update: The outcome information
-
-        Returns:
-            Updated incident or None if not found
+        The updated incident is written to SQLite first and then
+        the corresponding Hindsight memory is refreshed.
         """
-        incident = await self.get_incident(incident_id)
+
+        # --------------------------------------------------------------
+        # 1. Get exact incident from SQLite
+        # --------------------------------------------------------------
+
+        incident = await self.repository.get(incident_id)
+
         if not incident:
             return None
 
-        # Update fields
-        incident.action_taken = update.action_taken
-        incident.action_outcome = update.action_outcome
-        incident.confirmed_root_cause = update.confirmed_root_cause or incident.confirmed_root_cause
-        incident.resolution_details = update.resolution_details
-        incident.resolution_time_minutes = update.resolution_time_minutes
-        incident.technician_notes = update.technician_notes
+        # --------------------------------------------------------------
+        # 2. Update outcome fields
+        # --------------------------------------------------------------
 
-        # Store updated incident
-        content = self._incident_to_memory(incident)
+        incident.action_taken = update.action_taken
+
+        incident.action_outcome = update.action_outcome
+
+        if update.confirmed_root_cause:
+            incident.confirmed_root_cause = (
+                update.confirmed_root_cause
+            )
+
+        incident.resolution_details = (
+            update.resolution_details
+        )
+
+        incident.resolution_time_minutes = (
+            update.resolution_time_minutes
+        )
+
+        incident.technician_notes = (
+            update.technician_notes
+        )
+
+        # --------------------------------------------------------------
+        # 3. Update SQLite
+        # --------------------------------------------------------------
+
+        updated_incident = await self.repository.update(
+            incident
+        )
+
+        if updated_incident is None:
+            return None
+
+        # --------------------------------------------------------------
+        # 4. Refresh Hindsight memory
+        # --------------------------------------------------------------
+
+        content = self._incident_to_memory(
+            updated_incident
+        )
+
         metadata = {
-            "machine_id": incident.machine_id,
-            "machine_type": incident.machine_type,
-            "production_line": incident.production_line,
-            "defect_type": incident.defect_type,
+            "incident_id": updated_incident.incident_id,
+            "machine_id": updated_incident.machine_id,
+            "machine_type": updated_incident.machine_type,
+            "production_line": updated_incident.production_line,
+            "defect_type": updated_incident.defect_type,
             "has_outcome": True,
-            "outcome": incident.action_outcome.value,
+            "outcome": (
+                updated_incident.action_outcome.value
+                if updated_incident.action_outcome
+                else None
+            ),
         }
 
         await self.client.update_memory(
@@ -283,7 +539,11 @@ class MemoryService:
             metadata=metadata,
         )
 
-        return incident
+        return updated_incident
+
+    # ------------------------------------------------------------------
+    # Machine history
+    # ------------------------------------------------------------------
 
     async def get_machine_history(
         self,
@@ -291,53 +551,71 @@ class MemoryService:
         limit: int = 50,
     ) -> List[Incident]:
         """
-        Get incident history for a specific machine.
-
-        Args:
-            machine_id: The machine identifier
-            limit: Maximum number of results
-
-        Returns:
-            List of incidents for this machine
+        Get exact incident history for a machine from SQLite.
         """
-        memories = await self.client.list_memories(
-            filters={"machine_id": machine_id},
+
+        return await self.repository.list_by_machine(
+            machine_id=machine_id,
             limit=limit,
         )
 
-        incidents = []
-        for memory in memories:
-            try:
-                incidents.append(self._memory_to_incident(memory))
-            except Exception:
-                continue
-
-        # Sort by timestamp descending
-        incidents.sort(key=lambda x: x.timestamp, reverse=True)
-        return incidents
+    # ------------------------------------------------------------------
+    # Statistics
+    # ------------------------------------------------------------------
 
     async def get_statistics(self) -> Dict[str, Any]:
-        """Get overall statistics from memory."""
-        memories = await self.client.list_memories(limit=1000)
+        """
+        Get overall TRACE statistics from SQLite.
 
-        total = len(memories)
+        Statistics should use the exact structured database rather
+        than semantic recall.
+        """
+
+        incidents = await self.repository.list_all(
+            limit=10000
+        )
+
+        total = len(incidents)
+
         with_outcome = 0
-        outcomes = {"SUCCESS": 0, "PARTIAL": 0, "FAILED": 0, "UNKNOWN": 0}
+
+        outcomes = {
+            "SUCCESS": 0,
+            "PARTIAL": 0,
+            "FAILED": 0,
+            "UNKNOWN": 0,
+        }
+
         machines = set()
-        defect_types = {}
 
-        for memory in memories:
-            content = memory.get("content", memory)
-            machines.add(content.get("machine_id"))
+        defect_types: Dict[str, int] = {}
 
-            defect = content.get("defect_type")
+        for incident in incidents:
+
+            machines.add(incident.machine_id)
+
+            defect = incident.defect_type
+
             if defect:
-                defect_types[defect] = defect_types.get(defect, 0) + 1
+                defect_types[defect] = (
+                    defect_types.get(defect, 0) + 1
+                )
 
-            outcome = content.get("action_outcome")
+            outcome = incident.action_outcome
+
             if outcome:
                 with_outcome += 1
-                outcomes[outcome] = outcomes.get(outcome, 0) + 1
+
+                outcome_value = (
+                    outcome.value
+                    if isinstance(outcome, ActionOutcome)
+                    else str(outcome)
+                )
+
+                if outcome_value in outcomes:
+                    outcomes[outcome_value] += 1
+                else:
+                    outcomes[outcome_value] = 1
 
         return {
             "total_incidents": total,
