@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 
+from app.db.database import init_db
 from app.hindsight.memory import MemoryService
 from app.models import Incident, IncidentUpdate, ActionOutcome
 
@@ -515,6 +516,7 @@ SEED_DATA = [
 
 
 async def main():
+    await init_db()
     service = MemoryService()
 
     print("\n========================================")
