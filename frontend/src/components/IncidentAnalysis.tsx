@@ -46,10 +46,10 @@ const OUTCOME_GROUPS: { outcome: ActionOutcome; label: string; icon: typeof Chec
 ];
 
 const CONFIDENCE_STYLE: Record<string, string> = {
-  HIGH: "bg-green-100 text-green-800 border-green-200",
-  MEDIUM: "bg-amber-100 text-amber-800 border-amber-200",
-  LOW: "bg-orange-100 text-orange-800 border-orange-200",
-  INSUFFICIENT_DATA: "bg-gray-100 text-gray-700 border-gray-300",
+  HIGH: "bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/40 shadow-[0_0_12px_rgba(56,189,248,0.25)]",
+  MEDIUM: "bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.2)]",
+  LOW: "bg-orange-400/20 text-orange-300 border border-orange-400/40",
+  INSUFFICIENT_DATA: "bg-white/[0.06] text-[#8290ab] border border-white/10",
 };
 
 export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props) {
@@ -115,26 +115,31 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
   ).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-2 border-b border-white/10">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
+          <button onClick={onBack} className="p-2.5 text-[#8290ab] hover:text-white bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 rounded-2xl transition-all">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h2 className="text-2xl font-bold text-industrial-900">Incident Analysis</h2>
-            <p className="text-industrial-600">
-              {current_incident.incident_id} · {current_incident.machine_id} · {humanize(current_incident.defect_type)}
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-extrabold text-white tracking-tight">Incident Analysis</h2>
+              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-[#38bdf8]/10 text-[#38bdf8] border border-[#38bdf8]/30">
+                {current_incident.incident_id}
+              </span>
+            </div>
+            <p className="text-xs text-[#8290ab] mt-0.5">
+              Asset {current_incident.machine_id} · Fault: {humanize(current_incident.defect_type)}
             </p>
           </div>
         </div>
         <button
           onClick={() => onViewMachineMemory(current_incident.machine_id)}
-          className="flex items-center gap-2 px-4 py-2 text-industrial-600 hover:text-industrial-800 hover:bg-industrial-50 rounded-lg"
+          className="btn-neon-outline flex items-center gap-2 px-4 py-2 text-xs font-semibold"
         >
-          <Database className="w-5 h-5" />
-          {current_incident.machine_id} memory
+          <Database className="w-4 h-4 text-[#38bdf8]" />
+          Recall {current_incident.machine_id} Timeline
         </button>
       </div>
 
@@ -146,29 +151,29 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
         {/* ---------------- Left: what happened, recommendation, outcome ---------------- */}
         <div className="lg:col-span-3 space-y-6">
           {/* 1. What happened */}
-          <Section icon={<FileText className="w-5 h-5 text-industrial-600" />} step="1" title="What happened">
+          <Section icon={<FileText className="w-5 h-5 text-[#38bdf8]" />} step="1" title="What Happened">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
               <Field label="Machine" value={`${current_incident.machine_id}`} sub={humanize(current_incident.machine_type)} />
               <Field label="Line" value={current_incident.production_line} />
               <Field label="Problem" value={humanize(current_incident.defect_type)} />
               <Field label="Reported" value={formatDate(current_incident.timestamp)} />
               {current_incident.operating_hours ? (
-                <Field label="Operating hours" value={current_incident.operating_hours.toLocaleString()} />
+                <Field label="Operating Hours" value={current_incident.operating_hours.toLocaleString()} />
               ) : null}
               {current_incident.technician_id ? <Field label="Technician" value={current_incident.technician_id} /> : null}
             </div>
             {current_incident.symptoms.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {current_incident.symptoms.map((s) => (
-                  <span key={s} className="px-2 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-xs">
+                  <span key={s} className="px-3 py-1 bg-amber-400/10 text-amber-300 border border-amber-400/30 rounded-full text-xs font-medium">
                     {s}
                   </span>
                 ))}
               </div>
             )}
-            <p className="text-gray-700 text-sm">{current_incident.description}</p>
+            <p className="text-[#f3f6ff] text-sm bg-white/[0.04] p-3.5 rounded-2xl border border-white/10">{current_incident.description}</p>
             {current_incident.sensor_values && Object.keys(current_incident.sensor_values).length > 0 && (
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-[#8290ab] mt-2">
                 Readings:{" "}
                 {Object.entries(current_incident.sensor_values)
                   .map(([k, v]) => `${humanize(k)} ${v}`)
@@ -179,50 +184,49 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
 
           {/* 5-7. Recommendation (deterministic) */}
           <Section
-            icon={<Calculator className="w-5 h-5 text-industrial-600" />}
+            icon={<Calculator className="w-5 h-5 text-[#38bdf8]" />}
             step="5"
-            title="What TRACE recommends"
+            title="TRACE Recommendation"
             aside={
-              <span className={cn("px-3 py-1 rounded-full text-sm font-semibold border", CONFIDENCE_STYLE[recommendation.confidence])}>
+              <span className={cn("px-3 py-1 rounded-full text-xs font-semibold border", CONFIDENCE_STYLE[recommendation.confidence])}>
                 {recommendation.confidence === "INSUFFICIENT_DATA" ? "Insufficient evidence" : `${recommendation.confidence} confidence`}
               </span>
             }
           >
             <div
               className={cn(
-                "rounded-lg p-4 mb-3 border",
-                hasRecommendation ? "bg-industrial-50 border-industrial-200" : "bg-gray-50 border-gray-300 border-dashed"
+                "rounded-2xl p-4 mb-4 border relative overflow-hidden",
+                hasRecommendation ? "bg-[#0d1a38]/90 border-[#38bdf8]/40 shadow-[0_0_25px_rgba(56,189,248,0.15)]" : "bg-white/[0.03] border-white/10 border-dashed"
               )}
             >
-              <p className={cn("text-lg font-semibold", hasRecommendation ? "text-industrial-900" : "text-gray-600")}>
+              <p className={cn("text-lg font-extrabold tracking-tight", hasRecommendation ? "text-white" : "text-[#8290ab]")}>
                 {recommendation.suggested_action}
               </p>
               {hasRecommendation && recommendation.evidence[0] && (
-                <p className="text-sm text-industrial-700 mt-1">
-                  Most recent successful instance: “{recommendation.evidence[0].example_action}”
+                <p className="text-xs text-[#38bdf8] mt-1 font-mono">
+                  Verified historic precedent: “{recommendation.evidence[0].example_action}”
                   {recommendation.supporting_incidents[0] ? ` (${recommendation.supporting_incidents[0]})` : ""}
                 </p>
               )}
             </div>
 
             <div className="text-sm mb-4">
-              <p className="text-gray-500 text-xs uppercase tracking-wide mb-1">6-7. Why this confidence (computed)</p>
-              <p className="text-gray-800">{recommendation.basis}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                Selected by deterministic scoring of recorded outcomes: successes + ½·partials − failures, weighted toward this
-                machine. The AI does not choose the action.
+              <p className="text-[#8290ab] text-xs font-semibold uppercase tracking-wider mb-1">Mathematical Scoring Basis</p>
+              <p className="text-[#f3f6ff] text-sm">{recommendation.basis}</p>
+              <p className="text-xs text-[#50607d] mt-1.5">
+                Deterministic formula: successes + ½·partials − failures, weighted toward this machine asset. Zero LLM hallucination on core action.
               </p>
             </div>
 
             {recommendation.evidence.length > 0 && <EvidenceTable rows={recommendation.evidence} winner={recommendation.intervention_category} />}
 
             {recommendation.warnings.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <p className="font-medium text-amber-800 text-sm">Cautions from the evidence</p>
+              <div className="bg-amber-400/10 border border-amber-400/30 rounded-2xl p-4 mt-4">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  <p className="font-bold text-amber-300 text-xs uppercase tracking-wider">Cautions from Evidence Records</p>
                 </div>
-                <ul className="list-disc list-inside text-amber-800 text-sm space-y-1">
+                <ul className="list-disc list-inside text-amber-200/90 text-xs space-y-1">
                   {recommendation.warnings.map((w, i) => (
                     <li key={i}>{w}</li>
                   ))}
@@ -231,37 +235,36 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
             )}
 
             {/* AI-written explanation: visually separate from facts */}
-            <div className="mt-4 rounded-lg border-2 border-dashed border-purple-300 bg-purple-50/60 p-4">
+            <div className="mt-4 rounded-2xl border border-indigo-500/30 bg-indigo-950/20 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-purple-600" />
-                <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">
-                  {recommendation.reasoning_source === "llm" ? "AI-written summary of the evidence above" : "Rule-based summary (AI unavailable)"}
+                <Sparkles className="w-4 h-4 text-indigo-400" />
+                <p className="text-xs font-semibold uppercase tracking-wider text-indigo-300">
+                  {recommendation.reasoning_source === "llm" ? "AI synthesis of verified facts" : "Rule-based summary"}
                 </p>
               </div>
-              <p className="text-sm text-purple-950 italic">{recommendation.reasoning}</p>
-              <p className="text-xs text-purple-600 mt-2">
-                Wording only. Generated from the computed evidence; it cannot change the action or confidence, and any incident ID it
-                cites is checked against the retrieved records.
+              <p className="text-sm text-indigo-100/90 leading-relaxed italic">{recommendation.reasoning}</p>
+              <p className="text-[11px] text-indigo-400 mt-2">
+                Wording synthesis strictly constrained to cited work order IDs.
               </p>
             </div>
           </Section>
 
           {/* 8. Where the evidence came from */}
-          <Section icon={<Search className="w-5 h-5 text-industrial-600" />} step="8" title="Where the evidence came from">
-            <ol className="text-sm text-gray-700 space-y-2">
+          <Section icon={<Search className="w-5 h-5 text-[#38bdf8]" />} step="8" title="Where the evidence came from">
+            <ol className="text-sm text-gray-300 space-y-2">
               <li>
-                <span className="font-medium">Hindsight recall</span> on bank <code className="text-xs bg-gray-100 px-1 rounded">{memory_trace.bank}</code>,
+                <span className="font-medium text-white">Hindsight recall</span> on bank <code className="text-xs bg-white/10 text-[#38bdf8] px-2 py-0.5 rounded font-mono">{memory_trace.bank}</code>,
                 filtered to this machine type (plus a second pass for {current_incident.machine_id} itself):{" "}
-                <span className="font-medium">{memory_trace.memory_facts_recalled ?? 0} memory facts</span> from{" "}
-                <span className="font-medium">{memory_trace.incidents_recalled ?? 0} past work orders</span>.
+                <span className="font-semibold text-white">{memory_trace.memory_facts_recalled ?? 0} memory facts</span> from{" "}
+                <span className="font-semibold text-white">{memory_trace.incidents_recalled ?? 0} past work orders</span>.
               </li>
               <li>
-                <span className="font-medium">Relevance gate</span> ({memory_trace.relevance_rule}):{" "}
-                <span className="font-medium">{memory_trace.evidence_incidents ?? 0} kept as evidence</span>
+                <span className="font-medium text-white">Relevance gate</span> ({memory_trace.relevance_rule}):{" "}
+                <span className="font-semibold text-[#38bdf8]">{memory_trace.evidence_incidents ?? 0} kept as evidence</span>
                 {historical_incidents.length > 0 ? `, ${sameMachineCount} of them from ${current_incident.machine_id}.` : "."}
               </li>
               <li>
-                Every evidence item is the exact <span className="font-medium">SQLite work order</span> behind the recalled memory
+                Every evidence item is the exact <span className="font-medium text-white">SQLite work order</span> behind the recalled memory
                 (Hindsight document ID = incident ID).
               </li>
             </ol>
@@ -269,11 +272,11 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
 
           {/* Record outcome */}
           <Section
-            icon={<Save className="w-5 h-5 text-industrial-600" />}
+            icon={<Save className="w-5 h-5 text-[#38bdf8]" />}
             title="Record outcome"
             aside={
               saved ? (
-                <span className="flex items-center gap-1 text-green-600 text-sm">
+                <span className="flex items-center gap-1.5 text-[#38bdf8] text-sm font-semibold">
                   <CheckCircle className="w-4 h-4" />
                   Saved to SQLite and Hindsight
                 </span>
@@ -283,28 +286,28 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
             {!showOutcomeForm && !saved ? (
               <button
                 onClick={() => setShowOutcomeForm(true)}
-                className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-industrial-500 hover:text-industrial-600 transition-colors"
+                className="w-full py-3.5 border border-dashed border-white/20 rounded-2xl text-gray-400 hover:border-[#38bdf8]/60 hover:text-[#38bdf8] hover:bg-white/[0.03] transition-all font-medium text-sm"
               >
-                Record what was done and whether it worked
+                + Record what was done and whether it worked
               </button>
             ) : saved ? (
-              <p className="text-gray-600 text-sm">
-                Outcome recorded as <strong>{outcomeData.action_outcome}</strong> for “{outcomeData.intervention_category || outcomeData.action_taken}”.
+              <p className="text-gray-300 text-sm">
+                Outcome recorded as <strong className="text-white">{outcomeData.action_outcome}</strong> for “{outcomeData.intervention_category || outcomeData.action_taken}”.
                 The next similar incident will recall this work order.
               </p>
             ) : (
               <div className="space-y-4">
-                {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm">{error}</div>}
+                {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-300 text-sm">{error}</div>}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Intervention type</label>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Intervention type</label>
                     <input
                       list="intervention-categories"
                       value={outcomeData.intervention_category ?? ""}
                       onChange={(e) => setOutcomeData((p) => ({ ...p, intervention_category: e.target.value }))}
-                      placeholder="Pick or type"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500"
+                      placeholder="Pick or type category"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-[#141c38] text-white placeholder-gray-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all text-sm"
                     />
                     <datalist id="intervention-categories">
                       {categories.map((c) => (
@@ -313,30 +316,30 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
                     </datalist>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Action performed</label>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Action performed</label>
                     <input
                       type="text"
                       value={outcomeData.action_taken}
                       onChange={(e) => setOutcomeData((p) => ({ ...p, action_taken: e.target.value }))}
                       placeholder="What exactly was done"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-[#141c38] text-white placeholder-gray-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all text-sm"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Outcome</label>
-                  <div className="flex gap-2">
+                  <label className="block text-xs font-medium uppercase tracking-wider text-gray-400 mb-2">Outcome</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {(["SUCCESS", "PARTIAL", "FAILED", "UNKNOWN"] as ActionOutcome[]).map((outcome) => (
                       <button
                         key={outcome}
                         type="button"
                         onClick={() => setOutcomeData((p) => ({ ...p, action_outcome: outcome }))}
                         className={cn(
-                          "flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors",
+                          "py-2 px-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all",
                           outcomeData.action_outcome === outcome
-                            ? getOutcomeBgColor(outcome) + " border-transparent"
-                            : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                            ? getOutcomeBgColor(outcome) + " ring-1 ring-white/20"
+                            : "border-white/10 bg-white/[0.03] text-gray-400 hover:text-white hover:bg-white/[0.07]"
                         )}
                       >
                         {outcome}
@@ -347,13 +350,13 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirmed root cause</label>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Confirmed root cause</label>
                     <input
                       type="text"
                       value={outcomeData.confirmed_root_cause}
                       onChange={(e) => setOutcomeData((p) => ({ ...p, confirmed_root_cause: e.target.value }))}
                       placeholder="If known"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-[#141c38] text-white placeholder-gray-500 focus:outline-none focus:border-[#38bdf8] text-sm"
                     />
                   </div>
                   <NumberField
@@ -369,24 +372,28 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Technician notes</label>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Technician notes</label>
                   <textarea
                     value={outcomeData.technician_notes}
                     onChange={(e) => setOutcomeData((p) => ({ ...p, technician_notes: e.target.value }))}
                     rows={2}
                     placeholder="What you found, anything uncertain"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-[#141c38] text-white placeholder-gray-500 focus:outline-none focus:border-[#38bdf8] text-sm resize-none"
                   />
                 </div>
 
-                <div className="flex justify-end gap-3">
-                  <button type="button" onClick={() => setShowOutcomeForm(false)} className="px-4 py-2 text-gray-700 hover:text-gray-900">
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowOutcomeForm(false)}
+                    className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                  >
                     Cancel
                   </button>
                   <button
                     onClick={handleSaveOutcome}
                     disabled={saving || !outcomeData.action_taken}
-                    className="flex items-center gap-2 px-4 py-2 bg-industrial-600 text-white rounded-lg hover:bg-industrial-700 disabled:opacity-50"
+                    className="btn-neon-primary px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-40"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {saving ? "Saving..." : "Save to memory"}
@@ -399,31 +406,31 @@ export function IncidentAnalysis({ result, onBack, onViewMachineMemory }: Props)
 
         {/* ---------------- Right: what TRACE remembered ---------------- */}
         <div className="lg:col-span-2 space-y-6">
-          <Section icon={<History className="w-5 h-5 text-industrial-600" />} step="2-4" title="What TRACE remembered">
-            <p className="text-xs text-gray-500 mb-4">
+          <Section icon={<History className="w-5 h-5 text-[#38bdf8]" />} step="2-4" title="What TRACE remembered">
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">
               Past work orders recalled from Hindsight memory and loaded from the record system. These are historical facts, not AI
               output.
             </p>
             {historical_incidents.length === 0 ? (
-              <div className="text-center py-6 px-3 border border-dashed border-gray-300 rounded-lg">
-                <p className="text-gray-700 font-medium">No matching history</p>
-                <p className="text-gray-500 text-sm mt-1">
+              <div className="text-center py-8 px-4 border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+                <p className="text-gray-300 font-medium">No matching history</p>
+                <p className="text-gray-500 text-xs mt-1.5 leading-relaxed">
                   Recall returned {memory_trace.incidents_recalled ?? 0} work orders for this machine type, but none describes this
                   problem with a recorded outcome.
                 </p>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {OUTCOME_GROUPS.map(({ outcome, label, icon: Icon, tone }) => {
                   const items = historical_incidents.filter((h) => h.incident.action_outcome === outcome);
                   if (items.length === 0) return null;
                   return (
                     <div key={outcome}>
-                      <p className={cn("flex items-center gap-1.5 text-sm font-semibold mb-2", tone)}>
+                      <p className={cn("flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2.5", tone)}>
                         <Icon className="w-4 h-4" />
                         {label} ({items.length})
                       </p>
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {items.map((h) => (
                           <HistoryCard
                             key={h.incident.incident_id}
@@ -460,11 +467,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center gap-2 mb-4">
+    <div className="glass-card rounded-2xl p-6 border border-white/10 hover:border-white/15 transition-all">
+      <div className="flex items-center gap-2.5 mb-4">
         {icon}
-        <h3 className="text-lg font-semibold text-industrial-900">
-          {step && <span className="text-industrial-400 font-normal mr-1">{step}.</span>}
+        <h3 className="text-base font-bold text-white flex items-center">
+          {step && <span className="text-[#38bdf8] font-mono font-semibold mr-1.5">{step}.</span>}
           {title}
         </h3>
         {aside && <div className="ml-auto">{aside}</div>}
@@ -477,9 +484,9 @@ function Section({
 function Field({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="font-medium text-gray-900">{value}</p>
-      {sub && <p className="text-xs text-gray-500">{sub}</p>}
+      <p className="text-xs font-medium uppercase tracking-wider text-gray-400">{label}</p>
+      <p className="font-semibold text-white mt-0.5">{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -487,13 +494,13 @@ function Field({ label, value, sub }: { label: string; value: string; sub?: stri
 function NumberField({ label, value, onChange }: { label: string; value?: number; onChange: (v?: number) => void }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">{label}</label>
       <input
         type="number"
         min={0}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value ? parseInt(e.target.value) : undefined)}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-industrial-500"
+        className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-[#141c38] text-white placeholder-gray-500 focus:outline-none focus:border-[#38bdf8] text-sm"
       />
     </div>
   );
@@ -503,30 +510,30 @@ function EvidenceTable({ rows, winner }: { rows: EvidenceSummary[]; winner?: str
   const ids = (row: EvidenceSummary, key: ActionOutcome) => (row.incident_ids[key] ?? []).join(", ");
   return (
     <div className="overflow-x-auto">
-      <p className="text-gray-500 text-xs uppercase tracking-wide mb-1">Evidence tally from past work orders</p>
+      <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2">Evidence tally from past work orders</p>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs text-gray-500 border-b">
-            <th className="py-1.5 pr-2 font-medium">Intervention</th>
-            <th className="py-1.5 px-2 font-medium text-green-700">Worked</th>
-            <th className="py-1.5 px-2 font-medium text-amber-700">Partial</th>
-            <th className="py-1.5 px-2 font-medium text-red-700">Failed</th>
-            <th className="py-1.5 px-2 font-medium">Unverified</th>
-            <th className="py-1.5 pl-2 font-medium">On this machine</th>
+          <tr className="text-left text-xs uppercase tracking-wider text-gray-400 border-b border-white/10">
+            <th className="py-2 pr-2 font-medium">Intervention</th>
+            <th className="py-2 px-2 font-medium text-[#38bdf8]">Worked</th>
+            <th className="py-2 px-2 font-medium text-amber-400">Partial</th>
+            <th className="py-2 px-2 font-medium text-red-400">Failed</th>
+            <th className="py-2 px-2 font-medium text-gray-400">Unverified</th>
+            <th className="py-2 pl-2 font-medium text-white">On this machine</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-white/5">
           {rows.map((row) => (
             <tr
               key={row.intervention_category}
-              className={cn("border-b last:border-0", row.intervention_category === winner && "bg-green-50/60 font-medium")}
+              className={cn("transition-colors", row.intervention_category === winner ? "bg-[#38bdf8]/10 font-semibold" : "hover:bg-white/[0.02]")}
             >
-              <td className="py-1.5 pr-2">{row.intervention_category}</td>
-              <td className="py-1.5 px-2 text-green-700" title={ids(row, "SUCCESS")}>{row.successes}</td>
-              <td className="py-1.5 px-2 text-amber-700" title={ids(row, "PARTIAL")}>{row.partials}</td>
-              <td className="py-1.5 px-2 text-red-700" title={ids(row, "FAILED")}>{row.failures}</td>
-              <td className="py-1.5 px-2 text-gray-500" title={ids(row, "UNKNOWN")}>{row.unknowns}</td>
-              <td className="py-1.5 pl-2 text-gray-700">
+              <td className="py-2.5 pr-2 text-white">{row.intervention_category}</td>
+              <td className="py-2.5 px-2 text-[#38bdf8] font-bold" title={ids(row, "SUCCESS")}>{row.successes}</td>
+              <td className="py-2.5 px-2 text-amber-400 font-bold" title={ids(row, "PARTIAL")}>{row.partials}</td>
+              <td className="py-2.5 px-2 text-red-400 font-bold" title={ids(row, "FAILED")}>{row.failures}</td>
+              <td className="py-2.5 px-2 text-gray-400" title={ids(row, "UNKNOWN")}>{row.unknowns}</td>
+              <td className="py-2.5 pl-2 text-gray-300">
                 {row.same_machine_successes || row.same_machine_failures
                   ? `${row.same_machine_successes} worked, ${row.same_machine_failures} failed`
                   : "-"}
@@ -535,7 +542,7 @@ function EvidenceTable({ rows, winner }: { rows: EvidenceSummary[]; winner?: str
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-gray-400 mt-1">Hover a count to see the work order IDs.</p>
+      <p className="text-xs text-gray-500 mt-2">Hover a count to see the work order IDs.</p>
     </div>
   );
 }
@@ -555,18 +562,18 @@ function HistoryCard({
   const sameMachine = incident.machine_id === currentMachine;
 
   return (
-    <div className={cn("border rounded-lg overflow-hidden", sameMachine ? "border-industrial-300" : "border-gray-200")}>
-      <button onClick={onToggle} className="w-full text-left p-3 hover:bg-gray-50">
+    <div className={cn("rounded-2xl border transition-all overflow-hidden", sameMachine ? "border-[#38bdf8]/30 bg-[#38bdf8]/[0.03]" : "border-white/10 bg-[#0e1326]/70")}>
+      <button onClick={onToggle} className="w-full text-left p-3.5 hover:bg-white/[0.03] transition-colors">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{incident.intervention_category ?? incident.action_taken}</p>
-            <p className="text-xs text-gray-500">
-              {incident.incident_id} · {formatDay(incident.timestamp)} · {incident.machine_id}
-              {sameMachine && <span className="ml-1 px-1.5 py-0.5 rounded bg-industrial-100 text-industrial-700">this machine</span>}
+            <p className="text-sm font-semibold text-white truncate">{incident.intervention_category ?? incident.action_taken}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {incident.incident_id} · {formatDay(incident.timestamp)} · <span className="font-mono text-gray-300">{incident.machine_id}</span>
+              {sameMachine && <span className="ml-2 px-2 py-0.5 rounded-full bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/30 font-semibold text-[10px]">THIS MACHINE</span>}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-gray-500" title="Hindsight semantic similarity">
+            <span className="text-xs text-[#38bdf8] font-mono font-semibold" title="Hindsight semantic similarity">
               {Math.round(similarity_score * 100)}% match
             </span>
             {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
@@ -575,33 +582,33 @@ function HistoryCard({
       </button>
 
       {expanded && (
-        <div className="px-3 pb-3 border-t border-gray-100 text-sm space-y-2 pt-2">
-          <p className="text-gray-700">{incident.description}</p>
-          <p>
-            <span className="text-gray-500">Action:</span> {incident.action_taken}{" "}
-            <span className={cn("text-xs px-1.5 py-0.5 rounded ml-1", getOutcomeBgColor(incident.action_outcome))}>
+        <div className="px-3.5 pb-3.5 border-t border-white/10 text-sm space-y-2.5 pt-3">
+          <p className="text-gray-300 leading-relaxed">{incident.description}</p>
+          <p className="text-xs text-gray-300">
+            <span className="text-gray-400">Action:</span> <strong className="text-white">{incident.action_taken}</strong>{" "}
+            <span className={cn("text-xs px-2 py-0.5 rounded-full font-bold ml-1.5", getOutcomeBgColor(incident.action_outcome))}>
               {incident.action_outcome}
             </span>
           </p>
           {incident.confirmed_root_cause && (
-            <p>
-              <span className="text-gray-500">Confirmed cause:</span> {incident.confirmed_root_cause}
+            <p className="text-xs text-gray-300">
+              <span className="text-gray-400">Confirmed cause:</span> <span className="text-white font-medium">{incident.confirmed_root_cause}</span>
             </p>
           )}
           {incident.technician_notes && (
-            <p className="text-gray-700">
-              <span className="text-gray-500">Technician {incident.technician_id ?? ""} notes:</span> “{incident.technician_notes}”
+            <p className="text-xs text-gray-300 italic">
+              <span className="text-gray-400 not-italic">Technician {incident.technician_id ?? ""} notes:</span> “{incident.technician_notes}”
             </p>
           )}
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-400">
             Downtime {formatHours(incident.downtime_minutes)}
             {incident.severity ? ` · severity ${incident.severity}` : ""}
             {incident.operating_hours ? ` · ${incident.operating_hours.toLocaleString()} h` : ""}
           </p>
           {recalled_facts.length > 0 && (
-            <div className="bg-gray-50 rounded p-2">
-              <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-0.5">Recalled from Hindsight memory</p>
-              <p className="text-xs text-gray-600 font-mono leading-relaxed">{recalled_facts[0]}</p>
+            <div className="bg-white/[0.03] border border-white/10 rounded-xl p-3">
+              <p className="text-[10px] uppercase tracking-wider text-[#38bdf8] font-bold mb-1">Recalled from Hindsight memory</p>
+              <p className="text-xs text-gray-300 font-mono leading-relaxed">{recalled_facts[0]}</p>
             </div>
           )}
         </div>
@@ -616,14 +623,14 @@ function MemoryMoment({ result }: { result: AnalysisResult }) {
 
   if (count === 0) {
     return (
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl p-6">
+      <div className="glass-card border border-dashed border-white/20 rounded-2xl p-6">
         <div className="flex items-center gap-4">
-          <div className="p-4 bg-gray-200 rounded-full">
-            <Search className="w-8 h-8 text-gray-400" />
+          <div className="p-3.5 bg-white/5 rounded-2xl border border-white/10">
+            <Search className="w-7 h-7 text-gray-400" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-gray-700">No Relevant History Found</h3>
-            <p className="text-gray-500 mt-1">
+            <h3 className="text-lg font-bold text-white">No Relevant History Found</h3>
+            <p className="text-gray-400 text-xs mt-1 leading-relaxed">
               Hindsight recalled {result.memory_trace.incidents_recalled ?? 0} work orders for this machine type, but none
               describes this problem with a recorded outcome. TRACE will not guess an action; record the outcome to start
               building memory.
@@ -638,38 +645,38 @@ function MemoryMoment({ result }: { result: AnalysisResult }) {
   const top = historical_incidents.reduce((m, h) => Math.max(m, h.similarity_score), 0);
 
   return (
-    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+    <div className="glass-card border border-[#38bdf8]/30 bg-gradient-to-r from-[#38bdf8]/10 via-[#3a6cff]/5 to-transparent rounded-2xl p-6 relative overflow-hidden">
       <div className="flex items-start gap-4">
-        <div className="p-4 bg-green-100 rounded-full">
-          <Brain className="w-8 h-8 text-green-600" />
+        <div className="p-3.5 bg-[#38bdf8]/20 border border-[#38bdf8]/30 rounded-2xl text-[#38bdf8]">
+          <Brain className="w-7 h-7" />
         </div>
         <div className="flex-1">
-          <h3 className="text-xl font-bold text-green-800">
+          <h3 className="text-lg font-bold text-white">
             TRACE Found {count} Related Historical Incident{count !== 1 ? "s" : ""}
             {sameMachine > 0 && (
-              <span className="text-base font-medium text-green-700"> ({sameMachine} on {current_incident.machine_id})</span>
+              <span className="text-sm font-semibold text-[#38bdf8]"> ({sameMachine} on {current_incident.machine_id})</span>
             )}
           </h3>
-          <div className="flex flex-wrap gap-4 mt-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-green-700 font-medium">{successful_interventions.length} worked</span>
+          <div className="flex flex-wrap gap-3 mt-3">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#38bdf8]/10 border border-[#38bdf8]/20">
+              <CheckCircle className="w-4 h-4 text-[#38bdf8]" />
+              <span className="text-[#38bdf8] text-xs font-bold">{successful_interventions.length} worked</span>
             </div>
             {failed_interventions.length > 0 && (
-              <div className="flex items-center gap-2">
-                <XCircle className="w-5 h-5 text-red-500" />
-                <span className="text-red-600 font-medium">{failed_interventions.length} failed</span>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+                <XCircle className="w-4 h-4 text-red-400" />
+                <span className="text-red-400 text-xs font-bold">{failed_interventions.length} failed</span>
               </div>
             )}
             {partial_interventions.length > 0 && (
-              <div className="flex items-center gap-2">
-                <MinusCircle className="w-5 h-5 text-amber-500" />
-                <span className="text-amber-700 font-medium">{partial_interventions.length} partially worked</span>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+                <MinusCircle className="w-4 h-4 text-amber-400" />
+                <span className="text-amber-400 text-xs font-bold">{partial_interventions.length} partial</span>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-blue-500" />
-              <span className="text-blue-600 font-medium">{Math.round(top * 100)}% top similarity</span>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
+              <Target className="w-4 h-4 text-blue-400" />
+              <span className="text-blue-400 text-xs font-bold">{Math.round(top * 100)}% top similarity</span>
             </div>
           </div>
         </div>
@@ -681,12 +688,12 @@ function MemoryMoment({ result }: { result: AnalysisResult }) {
 function PipelineDebug({ result }: { result: AnalysisResult }) {
   const { memory_trace: trace, recommendation } = result;
   return (
-    <div className="bg-gray-900 text-gray-100 rounded-lg p-4 font-mono text-sm">
+    <div className="glass-card border border-amber-500/20 rounded-2xl p-4 font-mono text-xs text-gray-300">
       <div className="flex items-center gap-2 mb-3">
-        <Zap className="w-4 h-4 text-yellow-400" />
-        <span className="text-yellow-400 font-semibold">TRACE PIPELINE</span>
+        <Zap className="w-4 h-4 text-amber-400" />
+        <span className="text-amber-400 font-bold uppercase tracking-wider">TRACE PIPELINE</span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1.5">
         <PipelineStep label="Hindsight recall (fleet + this machine)" value={`${trace.memory_facts_recalled ?? 0} facts`} status="success" />
         <PipelineStep label="Past work orders recalled" value={`${trace.incidents_recalled ?? 0}`} />
         <PipelineStep label="Relevance gate: kept as evidence" value={`${trace.evidence_incidents ?? 0}`} />
@@ -706,11 +713,11 @@ function PipelineDebug({ result }: { result: AnalysisResult }) {
 function PipelineStep({ label, status, value }: { label: string; status?: "success" | "skipped"; value?: string }) {
   return (
     <div className="flex items-center gap-2">
-      {status === "success" && <span className="text-green-400">✓</span>}
+      {status === "success" && <span className="text-[#38bdf8]">✓</span>}
       {status === "skipped" && <span className="text-gray-500">○</span>}
       {!status && <span className="text-gray-500">·</span>}
       <span className="text-gray-400">{label}</span>
-      {value && <span className="text-white ml-auto truncate max-w-[50%]" title={value}>{value}</span>}
+      {value && <span className="text-white ml-auto truncate max-w-[50%] font-semibold" title={value}>{value}</span>}
     </div>
   );
 }
