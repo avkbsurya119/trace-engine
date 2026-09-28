@@ -31,6 +31,10 @@ cd backend && python -m scripts.demo --reset
 - **Use the presets:** the Report form has a *Load a demo incident* picker with the same incidents `scripts/demo.py` uses, so nothing needs to be typed live.
 - **Use deep links to jump between scenes:** `/?view=dashboard`, `/?view=intelligence`, `/?view=memory&machine=CNC-204`, `/?view=sliders`.
 
+**If you're asked "is the data real?"** No, it's synthetic, but TRACE is data-driven end to end. Nothing is hardcoded: every recommendation and chart is computed from whatever work orders are loaded. A real plant's CMMS export goes in through the same seeding path and TRACE starts learning from that history. (README → *Synthetic data, real-data ready*.)
+
+The demo follows the [problem statement](docs/HackwithHyderabad%203.0%20Problem%20Statament.docx): memory is the star, the before/after is visible in under a minute (Scenes 2–5), and TRACE visibly gets smarter.
+
 ---
 
 ## Scene 0: Landing page

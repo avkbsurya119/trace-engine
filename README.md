@@ -9,7 +9,8 @@ When a machine fails, TRACE recalls similar past work orders from **[Hindsight](
 | **Live app** | https://trace-frontend-i5gp.onrender.com/ |
 | **Live API** | https://trace-api-60le.onrender.com · [Swagger docs](https://trace-api-60le.onrender.com/docs) · [health](https://trace-api-60le.onrender.com/api/dashboard/health) |
 | **Stack** | Next.js 14 · FastAPI · SQLite · Hindsight (`hindsight-client`) · Groq `openai/gpt-oss-120b` |
-| **Data** | 567 synthetic, operationally realistic work orders · 39 machines · 5 equipment types · 15 months |
+| **Data** | 567 synthetic, operationally realistic work orders · 39 machines · 5 equipment types · 15 months ([works the same on real data](#synthetic-data-real-data-ready)) |
+| **Brief** | Built for *AI Agents That Learn Using Hindsight*; see the [problem statement](docs/HackwithHyderabad%203.0%20Problem%20Statament.docx) and [how TRACE meets it](#how-trace-meets-the-brief) |
 
 > Render's free tier sleeps when idle, so the first request can take 30–60 s while the API wakes up.
 
@@ -27,6 +28,21 @@ TRACE turns that history into memory:
 - **Learns.** Recording an outcome immediately changes what the next similar incident is told.
 - **Explains.** Each recommendation shows the outcomes it came from, why the alternatives lost, and how its confidence was reached.
 - **Stays honest.** With no evidence there is no recommendation. Failed repairs count as evidence, and the LLM cannot change the decision.
+
+---
+
+## How TRACE meets the brief
+
+The [problem statement](docs/HackwithHyderabad%203.0%20Problem%20Statament.docx) asks for an agent built on Hindsight that remembers, recalls and improves over time, for a real business workflow, with memory as the star and a before/after story visible within 60 seconds. It lists an *Incident Response Agent* ("remembers past incidents, their root causes, resolution steps, and which runbooks worked") as a model idea. TRACE is that idea applied to the factory floor.
+
+| The brief asks for | TRACE |
+|---|---|
+| Hindsight as the memory layer | Every work order is retained in Hindsight and recalled by meaning with tag filters; nothing is recommended without recalled evidence |
+| Memory as the star, with a clear before/after | *With vs without memory* scores the same incident live; the AC-407 demo goes from "no recommendation" to a cited fix after one recorded outcome |
+| Learning and improving over time | Each recorded outcome immediately changes the next answer; TRACE Intelligence shows coverage growing from 11 to 24 of 25 problems |
+| Recall across days and weeks | Evidence spans 15 months, with recency labels, and repair chains months apart (CNC-204, HP-303) |
+| A real business problem | Unplanned downtime costs thousands per hour; repeated wrong fixes are the waste TRACE removes |
+| Groq with `openai/gpt-oss-120b`, robust to LLM errors | Used for wording only, validated, with a deterministic fallback on any error |
 
 ---
 
@@ -192,6 +208,17 @@ The data is synthetic but operationally realistic. `backend/app/data/generator.p
 - **Outcomes come from a model, not random labels.** Each problem has 2–3 possible causes and each fix only works for some of them. Technicians often suspect the wrong cause or try the cheap fix first, and failed or partial repairs create follow-up work orders days later.
 
 `python -m scripts.audit_data` checks for duplicates and validates timestamps, sensor bounds, downtime vs repair time, fleet consistency, notes vs outcomes and the progression of operating hours.
+
+### Synthetic data, real-data ready
+
+The data is synthetic only because no plant would share its maintenance records for a public project. **Nothing in TRACE depends on it.**
+
+- **No hardcoded answers.** The pipeline, relevance gate, scoring engine and TRACE Intelligence contain no fixed machines, problems or results. Every recommendation, confidence level and chart is computed at request time from whatever work orders are in SQLite and Hindsight.
+- **Real data loads through the same path.** A CMMS export (SAP PM, Maximo, Fiix, …) mapped to the incident schema goes in through the same `retain_many` path `seed_data.py` uses. Nothing else changes, and the recommendations start reflecting that plant's own history.
+- **New equipment is configuration.** Adding a new equipment type or problem means adding it to `catalog.py`, which drives the report form. Free-text problems and interventions already work without that step.
+- **Harder data suits TRACE.** Real records are messier: different words for the same fault, missing outcomes, repeated fixes. That is exactly what semantic recall, UNKNOWN-outcome handling and the insufficient-evidence rule are for.
+
+The synthetic history was modelled on how real maintenance behaves (competing causes, wrong first guesses, follow-ups) so that these behaviours are exercised and tested before the system ever sees real records.
 
 ---
 

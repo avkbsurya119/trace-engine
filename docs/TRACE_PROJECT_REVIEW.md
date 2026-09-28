@@ -46,6 +46,7 @@ Trial and error is the main source of wasted downtime.
 
 - **Judging weights:** Innovation 30 %, Use of Hindsight Memory 25 %, Technical Implementation 20 %, User Experience 15 %, Real-world Impact 10 %.
 - **Brief requirement:** a clear before/after-memory story within 60 seconds.
+- **Source:** [problem statement](HackwithHyderabad%203.0%20Problem%20Statament.docx) in this folder. It lists an *Incident Response Agent* as a model idea, and TRACE applies it to manufacturing maintenance.
 
 ---
 
@@ -223,6 +224,13 @@ SQLite through async SQLAlchemy 2 (`aiosqlite`), in the file `backend/trace.db` 
 2. Three days later, `WO-2025-04558`: bearing replacement → **SUCCESS**.
 
 **Contents.** 567 generated work orders, plus any live demo incidents. The deployed instance showed 569 at the time of writing.
+
+**Synthetic data, real-data ready.** The data is synthetic because real plant maintenance records aren't publicly shareable, but the system is fully data-driven.
+
+- Nothing in the gate, engine or Intelligence service hardcodes machines, problems or outcomes; every result is computed at request time from the stored work orders.
+- A real CMMS export mapped to this schema loads through the same `retain_many` path `seed_data.py` uses.
+- New equipment types or problems are a `catalog.py` entry, and free-text problems and interventions already work.
+- The generator deliberately models real-world messiness (competing causes, wrong first guesses, follow-ups, unverified outcomes), so the behaviours real data needs are already exercised and tested.
 
 ---
 
