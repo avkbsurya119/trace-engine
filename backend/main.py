@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.api import incidents_router, dashboard_router
+from app.api import incidents_router, dashboard_router, intelligence_router
 from app.core.errors import MemoryUnavailableError
 from app.db.database import init_db, close_db
 
@@ -53,6 +53,7 @@ async def unhandled_error(request: Request, exc: Exception):
 # Include routers
 app.include_router(incidents_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(intelligence_router, prefix="/api")
 
 
 @app.get("/")
