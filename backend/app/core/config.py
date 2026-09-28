@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     # API Keys
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    groq_api_key: str = ""
+
+    # LLM phrasing (OpenAI-compatible endpoint; Groq by default)
+    llm_base_url: str = "https://api.groq.com/openai/v1"
+    llm_model: str = "openai/gpt-oss-120b"
+    llm_timeout_seconds: float = 20.0
 
     # Hindsight Configuration
     hindsight_api_url: str = "http://localhost:8100"
