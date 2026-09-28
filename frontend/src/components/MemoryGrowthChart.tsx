@@ -2,20 +2,12 @@
 
 import { useState } from "react";
 import type { MemoryGrowthPoint } from "@/types/incident";
+import { formatMonth } from "@/lib/utils";
 
 const WIDTH = 1000;
 const HEIGHT = 170;
 const PAD = { top: 12, right: 12, bottom: 24, left: 44 };
 const LINE = "#466968"; // industrial-600
-
-function monthLabel(month: string, withYear = false) {
-  const [y, m] = month.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-GB", {
-    month: "short",
-    ...(withYear ? { year: "numeric" } : {}),
-    timeZone: "UTC",
-  });
-}
 
 /**
  * Single series: cumulative recorded outcomes in memory, by month.
@@ -44,7 +36,7 @@ export function MemoryGrowthChart({ points }: { points: MemoryGrowthPoint[] }) {
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="w-full h-auto"
         role="img"
-        aria-label={`Recorded outcomes in memory grew from ${points[0].cumulative_outcomes} in ${monthLabel(points[0].month, true)} to ${points[points.length - 1].cumulative_outcomes} in ${monthLabel(points[points.length - 1].month, true)}`}
+        aria-label={`Recorded outcomes in memory grew from ${points[0].cumulative_outcomes} in ${formatMonth(points[0].month, true)} to ${points[points.length - 1].cumulative_outcomes} in ${formatMonth(points[points.length - 1].month, true)}`}
         onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
@@ -64,7 +56,7 @@ export function MemoryGrowthChart({ points }: { points: MemoryGrowthPoint[] }) {
         {points.map((p, i) =>
           i % labelEvery === 0 || i === points.length - 1 ? (
             <text key={p.month} x={x(i)} y={HEIGHT - 6} textAnchor="middle" fontSize={11} fill="#6b7280">
-              {monthLabel(p.month, i === 0 || p.month.endsWith("-01"))}
+              {formatMonth(p.month, i === 0 || p.month.endsWith("-01"))}
             </text>
           ) : null
         )}
@@ -82,7 +74,7 @@ export function MemoryGrowthChart({ points }: { points: MemoryGrowthPoint[] }) {
           className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-md bg-gray-900 text-white text-xs px-2.5 py-1.5 shadow"
           style={{ left: `${(x(hover) / WIDTH) * 100}%` }}
         >
-          <p className="font-semibold">{monthLabel(active.month, true)}</p>
+          <p className="font-semibold">{formatMonth(active.month, true)}</p>
           <p>{active.cumulative_outcomes} outcomes in memory</p>
           <p className="text-gray-300">+{active.incidents} work orders that month</p>
         </div>
@@ -99,7 +91,7 @@ export function MemoryGrowthChart({ points }: { points: MemoryGrowthPoint[] }) {
         <tbody>
           {points.map((p) => (
             <tr key={p.month}>
-              <td>{monthLabel(p.month, true)}</td>
+              <td>{formatMonth(p.month, true)}</td>
               <td>{p.incidents}</td>
               <td>{p.cumulative_outcomes}</td>
             </tr>

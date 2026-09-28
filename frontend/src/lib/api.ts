@@ -12,6 +12,8 @@ import type {
   Fleet,
   HeroMachine,
   HealthStatus,
+  IntelligenceReport,
+  ProblemKnowledge,
 } from "@/types/incident";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
@@ -50,6 +52,7 @@ const enc = encodeURIComponent;
 // expensive (six recalls), so both are fetched once per page session.
 let fleetCache: Promise<Fleet> | null = null;
 let heroCache: Promise<{ hero_machines: HeroMachine[] }> | null = null;
+let intelligenceCache: Promise<IntelligenceReport> | null = null;
 
 function cached<T>(get: () => Promise<T> | null, set: (p: Promise<T> | null) => void, load: () => Promise<T>) {
   const existing = get();
@@ -66,11 +69,13 @@ export const api = {
   /**
    * Submit an incident for analysis
    */
-  analyzeIncident: (incident: IncidentCreate): Promise<AnalysisResult> =>
-    fetchAPI<AnalysisResult>("/incidents/analyze", {
+  analyzeIncident: (incident: IncidentCreate): Promise<AnalysisResult> => {
+    intelligenceCache = null; // a new work order changes the intelligence report
+    return fetchAPI<AnalysisResult>("/incidents/analyze", {
       method: "POST",
       body: JSON.stringify(incident),
-    }),
+    });
+  },
 
   /**
    * Get a specific incident by ID
@@ -85,6 +90,7 @@ export const api = {
   // comparison is dropped.
   recordOutcome: (incidentId: string, update: IncidentUpdate): Promise<Incident> => {
     heroCache = null;
+    intelligenceCache = null;
     return fetchAPI<Incident>(`/incidents/${enc(incidentId)}/outcome`, {
       method: "PATCH",
       body: JSON.stringify(update),
@@ -115,6 +121,23 @@ export const api = {
   getHeroMachines: (options?: { refresh?: boolean }): Promise<{ hero_machines: HeroMachine[] }> => {
     if (options?.refresh) heroCache = null;
     return cached(() => heroCache, (p) => (heroCache = p), () => fetchAPI("/dashboard/hero-machines"));
+  },
+
+  /**
+   * TRACE Intelligence: accumulated-memory report (cached per session)
+   */
+  getIntelligence: (options?: { refresh?: boolean }): Promise<IntelligenceReport> => {
+    if (options?.refresh) intelligenceCache = null;
+    return cached(() => intelligenceCache, (p) => (intelligenceCache = p), () => fetchAPI<IntelligenceReport>("/intelligence"));
+  },
+
+  /**
+   * What TRACE would recommend for one problem from all recorded outcomes
+   */
+  getProblemKnowledge: (machineType: string, defectType: string, machineId?: string): Promise<ProblemKnowledge> => {
+    const params = new URLSearchParams({ machine_type: machineType, defect_type: defectType });
+    if (machineId) params.set("machine_id", machineId);
+    return fetchAPI<ProblemKnowledge>(`/intelligence/problem?${params}`);
   },
 
   /**
